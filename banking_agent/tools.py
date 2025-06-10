@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Dict
 from user_db_manager import UserSchema
 
-def get_promotional_policies(policies_path = 'backend/banking_agent/banking_promotional_policies.txt') -> str:
+def get_promotional_policies(policies_path = 'banking_agent/banking_promotional_policies.txt') -> str:
     content = ""
     with open(policies_path, 'r') as file:
         content = file.read()

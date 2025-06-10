@@ -2,15 +2,16 @@
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
-from google import genai
 from pydantic import BaseModel
-from genai import types
-from prompts import RECOMMENDATION_SYSTEM_PROMPT, RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, RAG_LLM_SYSTEM_PROMPT, RAG_LLM_RESPONSE_PROMPT
+from google import genai
+from google.genai import types
 from user_db_manager import DatabaseManager
-from tools import calculate_topic_care_weights_description, get_promotional_policies
 from transformers import AutoTokenizer
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client.models import Distance, VectorParams
+
+from .prompts import RECOMMENDATION_SYSTEM_PROMPT, RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, RAG_LLM_SYSTEM_PROMPT, RAG_LLM_RESPONSE_PROMPT
+from .tools import calculate_topic_care_weights_description, get_promotional_policies
 
 class SummarizationResponse(BaseModel):
     topics_of_interest: str
@@ -22,9 +23,9 @@ class BankingAgent:
         try:
             self.model_type = "gemini-1.5-flash"
             self.gemini_client = genai.Client()
-            self.chatbot = self.chatbot_client.chats.create(model=self.model_type)
-            self.embed_model = SentenceTransformer('BAAI/bge-m3', cache_folder=".cache")
-            self.qdrant_client = QdrantClient(url="qdrant_base:6333")
+            self.chatbot = self.gemini_client.chats.create(model=self.model_type)
+            self.embed_model = SentenceTransformer('BAAI/bge-m3')
+            self.qdrant_client = QdrantClient(url="qdrant_all:6333")
             self.user_db_manager = DatabaseManager()
             self.tokenizer = AutoTokenizer.from_pretrained("Cloyne/vietnamese-embedding_finetuned_pair")
     
@@ -42,23 +43,27 @@ class BankingAgent:
             raise e
     
     def create_qdrant_vector_collection(self, embeddings, description_chunks_obj, dim=1024, collection_name="PromotionalPolicies"):
-        if self.qdrant_client.collection_exists(collection_name):
+        try:
+            if self.qdrant_client.collection_exists(collection_name):
              self.qdrant_client.delete_collection(collection_name=collection_name)
 
-        self.qdrant_client.create_collection(
-            collection_name=collection_name,
-            vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
-        )
+            self.qdrant_client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
+            )
 
-        self.qdrant_client.upload_collection(
-            collection_name=collection_name,
-            vectors=embeddings,
-            payload=description_chunks_obj,
-            ids=None,   
-            batch_size=4,  # How many vectors will be uploaded in a single request?
-        )
+            self.qdrant_client.upload_collection(
+                collection_name=collection_name,
+                vectors=embeddings,
+                payload=description_chunks_obj,
+                ids=None,   
+                batch_size=4,  # How many vectors will be uploaded in a single request?
+            )
 
-        print("Successfully upload the collection!")
+            print("Successfully upload the collection!")
+        except Exception as e:
+            print(f"Error creating Qdrant vector collection: {e}")
+            raise e
 
     def embedding_promotional_policies(self) -> dict:
         try:
@@ -121,7 +126,7 @@ class BankingAgent:
         print("Final prompt for summarization:", final_prompt)
 
         try:
-            response = self.client.models.generate_content(
+            response = self.chatbot.models.generate_content(
                 model=self.model_type,
                 config={
                 'response_mime_type': 'application/json',
@@ -185,7 +190,7 @@ class BankingAgent:
 
         print("Final prompt for recommendation:", final_prompt)
 
-        response = self.client.models.generate_content(
+        response = self.gemini_client.models.generate_content(
             model=self.model_type,
             config=types.GenerateContentConfig(
                 system_instruction=RECOMMENDATION_SYSTEM_PROMPT),
@@ -219,7 +224,7 @@ class BankingAgent:
                 relevant_banking_info_policies=relevant_policies
             )
 
-            response = self.client.models.generate_content(
+            response = self.gemini_client.models.generate_content(
                 model=self.model_type,
                 config=types.GenerateContentConfig(
                     system_instruction=RAG_LLM_SYSTEM_PROMPT),

@@ -1,1 +1,1 @@
-from banking_agent import BankingAgent
+from .banking_agent import BankingAgent

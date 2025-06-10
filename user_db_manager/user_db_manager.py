@@ -4,9 +4,8 @@ from pymongo.server_api import ServerApi
 from dotenv import load_dotenv
 import os
 from pydantic import BaseModel, Field
-import time
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional
 
 class UserSchema(BaseModel):
     """
