@@ -213,7 +213,6 @@ class BankingAgent:
 
             current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance', 0)}."
 
-
             final_prompt = RAG_LLM_RESPONSE_PROMPT.format(
                 user_question=user_input,
                 current_financial_state=current_financial_state,
