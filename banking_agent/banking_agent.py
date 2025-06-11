@@ -7,8 +7,6 @@ from google import genai
 from google.genai import types
 from user_db_manager import DatabaseManager
 from transformers import AutoTokenizer
-from .prompts import AGENT_RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_CONVO_SYSTEM_PROMPT, AGENT_CONVO_RESPONSE_PROMPT
-from .tools import calculate_topic_care_weights_description, get_promotional_policies, search_internet_func
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.gemini import Gemini
@@ -28,11 +26,20 @@ from llama_index.core.storage.docstore.simple_docstore import (
 )
 from llama_index.core.extractors import DocumentContextExtractor
 
+# ------------------
+
+from .prompts import AGENT_RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_CONVO_SYSTEM_PROMPT, AGENT_CONVO_RESPONSE_PROMPT, AGENT_ORCHESTRATION_PROMPT
+from .tools import calculate_topic_care_weights_description, get_promotional_policies, search_internet_func
+from .utils_setting import financial_terms_vi, default_product_constraints
+
 class SummarizationResponse(BaseModel):
     topics_of_interest: List[str]
 
 class RecommendationQuestion(BaseModel):
     recommendations: List[str]
+
+class BankingRelatedQuestion(BaseModel):
+    related: bool
 
 load_dotenv()
 
@@ -141,7 +148,36 @@ class BankingAgent:
             self.user_db_manager.update_user_info(user_id, user_info)
         except Exception as e:
             print(f"Error updating user conversation: {e}")
+
+    def orchestrate(self, user_input) -> dict:
+        try:
+            final_prompt = AGENT_ORCHESTRATION_PROMPT.format(
+                user_question=user_input
+            )
+            response = self.recommendation_agent.models.generate_content(
+                model=self.model_type,
+                config={
+                'response_mime_type': 'application/json',
+                'response_schema': BankingRelatedQuestion,
+                },
+                contents=final_prompt
+            )
+
+            return {
+                "is_related": response.parsed.related,
+            }
+        except Exception as e:
+            print(f"Error orchestrating conversation: {e}")
+            return {"success": False, "message": str(e)}
     
+    def get_used_products(self, user_info) -> str:
+        used_products = []
+        for key, val in financial_terms_vi.items():
+            if key in user_info and user_info[key]:
+                used_products.append(val)
+
+        return ", ".join(used_products) if used_products else "Không có sản phẩm nào được sử dụng gần đây."
+
     def get_summarization_topics_of_interest_past_convo(self, user_info) -> str:
         past_conversations = user_info.get('past_conversations', '')
 
@@ -174,7 +210,7 @@ class BankingAgent:
             return "No summarization available at the moment."
     
 
-    def agent_recommendation_response(self, user_id) -> dict:
+    def agent_recommendation_response(self, user_id, top_k_questions=5) -> dict:
         try:
             user_info = self.user_db_manager.get_user_by_id(user_id)
             if not user_info:
@@ -191,11 +227,14 @@ class BankingAgent:
 
             current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance', 0)}. Số dư nợ hiện tại của người dùng: ${user_info.get('user_current_acc_debit', 0)}."
 
+            used_products = self.get_used_products()
+
             final_prompt = AGENT_RECOMMENDATION_RESPONSE_PROMPT.format(
                 topics_of_interest_from_past_conversations=summarization_past_convo,
                 topic_care_weights_description=topic_care_weights_description,
                 current_financial_state=current_financial_state,
                 current_banking_promotional_policies=current_banking_promotional_policies,
+                used_products=used_products,
                 user_type="regular"
             )
 
@@ -210,7 +249,7 @@ class BankingAgent:
                 contents=final_prompt
             )
 
-            recommendations = response.parsed.recommendations
+            recommendations = response.parsed.recommendations[:top_k_questions]
 
             print("Generated recommendation response:", recommendations)
             return {
@@ -234,6 +273,8 @@ class BankingAgent:
             
             if not user_id:
                 return {"success": False, "message": "No user ID provided."}
+            
+            # is_related = self.orchestrate(user_input)
             
             tracking_convo = "Vai trò: Người dùng\nNội dung: " + user_input + "\n"
 

@@ -4,6 +4,7 @@ from typing import Dict
 from user_db_manager import UserSchema
 import os
 
+
 def search_internet_func(query: str, num_results: int = 2) -> dict:
     """
     This function searches the internet for a given query and returns the results.
