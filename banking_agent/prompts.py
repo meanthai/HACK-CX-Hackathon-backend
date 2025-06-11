@@ -34,23 +34,18 @@ Các cuộc trò chuyện trước của người dùng như sau:
 """
 
 # ---------------------------------------------------------------------------------------------------------------------------------------------------------
-RAG_LLM_SYSTEM_PROMPT = "Bạn là một trợ lý ngân hàng thông minh và hữu ích, được thiết kế để hỗ trợ người dùng bằng cách trả lời các câu hỏi của họ dựa trên số dư tài khoản hiện tại và các ưu đãi khuyến mãi mới nhất có thể liên quan trả lời từ ứng dụng ngân hàng số. Với mỗi câu hỏi, hãy cung cấp câu trả lời chính xác, phù hợp và cá nhân hóa để giúp người dùng đưa ra các quyết định tài chính một cách sáng suốt."
+AGENT_SYSTEM_PROMPT = "Bạn là một trợ lý ngân hàng thông minh và hữu ích, được thiết kế để hỗ trợ người dùng bằng cách trả lời các câu hỏi của họ dựa trên số dư tài khoản hiện tại và các ưu đãi khuyến mãi mới nhất từ ứng dụng ngân hàng số có thể liên quan thông qua dùng tool truy vấn các thông tin cần thiết để trả lời. Với mỗi câu hỏi, hãy cung cấp câu trả lời chính xác, phù hợp và cá nhân hóa để giúp người dùng đưa ra các quyết định tài chính một cách sáng suốt."
 
 
-RAG_LLM_RESPONSE_PROMPT = """Dưới đây là câu hỏi của người dùng:
+AGENT_RESPONSE_PROMPT = """Dưới đây là câu hỏi của người dùng:
 -----
 \t{user_question}
 -----
 
-Vui lòng cung cấp câu trả lời chính xác, phù hợp và được cá nhân hóa để hỗ trợ người dùng giải đáp câu hỏi của họ (nên đưa ra các lựa chọn nếu có) hoặc giúp họ đưa ra các quyết định tài chính đúng đắn, dựa trên các thông tin sau:
+Vui lòng cung cấp câu trả lời chính xác, phù hợp và được cá nhân hóa để hỗ trợ người dùng giải đáp câu hỏi của họ (nên đưa ra các lựa chọn nếu có) hoặc giúp họ đưa ra các quyết định tài chính đúng đắn, dựa trên các thông tin (có thể liên quan hoặc không) sau:
 
 Thông tin trạng thái tài khoản ngân hàng của người dùng:
 -----
 \t{current_financial_state}
------
-
-Các chính sách khuyến mãi hoặc thông tin liên quan từ ngân hàng:
------
-\t{relevant_banking_info_policies}
 -----
 """

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from qdrant_client import QdrantClient
 from apscheduler.schedulers.background import BackgroundScheduler
 from banking_agent import BankingAgent
-
+from user_db_manager import UserSchema
 nest_asyncio.apply()
 
 class InputPrompt(BaseModel):
@@ -35,14 +35,46 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
+@app.post("/api/agent/update_user_info")
+def update_user_info(user_data: UserSchema):
+    try:
+        user_id = user_data.user_id
+        if not user_id:
+            return {"success": False, "message": "User ID is required for updating user info"}
+
+        response = banking_agent.user_db_manager.update_user_info(user_id, user_data.model_dump())
+        if response.get("success"):
+            return {"success": True, "message": "User info updated successfully"}
+        else:
+            return {"success": False, "message": response.get("message", "Failed to update user info")}
+    except Exception as e:
+        print("Error in update_user_info: ", e)
+        return {"success": False, "message": str(e)}
+
+@app.post("/api/agent/get_user_info")
+def get_user_info(user_id_input: UserID):
+    try:
+        user_id = user_id_input.user_id
+        if not user_id:
+            return {"success": False, "message": "User ID is required for getting user info"}
+
+        user_info = banking_agent.user_db_manager.get_user_by_id(user_id)
+        if not user_info:
+            return {"success": False, "message": "User not found"}
+
+        return {"success": True, "user_info": user_info}
+    except Exception as e:
+        print("Error in get_user_info: ", e)
+        return {"success": False, "message": str(e)}
+
 @app.post("/api/agent/create_user")
-def create_user(user_data: UserID):
+def create_user(user_data: UserSchema):
     try:
         user_id = user_data.user_id
         if not user_id:
             return {"success": False, "message": "User ID is required for creating a user"}
 
-        response = banking_agent.user_db_manager.create_user({"user_id": user_id})
+        response = banking_agent.user_db_manager.create_user(user_data.model_dump())
         if response.get("success"):
             return {"success": True, "message": "User created successfully"}
         else:
@@ -98,7 +130,7 @@ def rag_response(input_prompt: InputPrompt):
         if not user_id:
             return {"success": False, "message": "User not found for getting responses"}
 
-        response = banking_agent.rag_response(user_input, user_id)
+        response = banking_agent.agent_response(user_input, user_id)
         if not response.get("success"):
             return {"success": False, "message": response.get("message", "No response found")}
 
@@ -111,7 +143,7 @@ if __name__ == "__main__":
     qdrant_client = QdrantClient(url='qdrant_all:6333')
 
     banking_agent = BankingAgent()
-    banking_agent.embedding_promotional_policies()
+    banking_agent.create_banking_agent()
     
     # scheduler = BackgroundScheduler()
     # scheduler.add_job(code_generative_agent.delete_inactive_users, "interval", minutes=10)  # Check every 10 minutes

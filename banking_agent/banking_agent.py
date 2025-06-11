@@ -10,112 +10,138 @@ from user_db_manager import DatabaseManager
 from transformers import AutoTokenizer
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client.models import Distance, VectorParams
-from .prompts import RECOMMENDATION_SYSTEM_PROMPT, RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, RAG_LLM_SYSTEM_PROMPT, RAG_LLM_RESPONSE_PROMPT
-from .tools import calculate_topic_care_weights_description, get_promotional_policies
+from .prompts import RECOMMENDATION_SYSTEM_PROMPT, RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_SYSTEM_PROMPT, AGENT_RESPONSE_PROMPT
+from .tools import calculate_topic_care_weights_description, get_promotional_policies, search_internet_func
+from llama_index.vector_stores.qdrant import QdrantVectorStore
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.llms.gemini import Gemini
+from llama_index.core.tools import QueryEngineTool, ToolMetadata
+from llama_index.core.agent import ReActAgent
+from llama_index.vector_stores.qdrant import QdrantVectorStore
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+from llama_index.core.node_parser import TokenTextSplitter
+from typing import List
+from fastapi import UploadFile
+import os
+from llama_index.core import VectorStoreIndex, Settings, StorageContext
+from llama_index.vector_stores.qdrant import QdrantVectorStore
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
+from llama_parse import LlamaParse
+from llama_index.core.tools import FunctionTool
+from llama_index.core.storage.docstore.simple_docstore import (
+    SimpleDocumentStore,
+)
+from llama_index.core.extractors import DocumentContextExtractor
 
 class SummarizationResponse(BaseModel):
     topics_of_interest: str
 
-class RecommendationResponse(BaseModel):
-    response: str
-    explanation: str = Literal(description="Explanation of the recommendation provided by the agent, shorter than 15 words.")
+# class RecommendationResponse(BaseModel):
+#     response: str
+#     explanation: str = Literal(description="Explanation of the recommendation provided by the agent, shorter than 15 words.")
 
 load_dotenv()
 
 class BankingAgent:
     def __init__(self):
         try:
-            self.model_type = "gemini-1.5-flash"
-            self.gemini_client = genai.Client()
-            self.chatbot = self.gemini_client.chats.create(model=self.model_type)
+            self.model_type = "gemini-2.0-flash"
+            self.gemini_client = genai.Client() # for summarization and recommendation generation
+            self.agent = None # Agent for handling conversations and using tools
             self.embed_model = SentenceTransformer('BAAI/bge-m3')
             self.qdrant_client = QdrantClient(url="qdrant_all:6333")
             self.user_db_manager = DatabaseManager()
             self.tokenizer = AutoTokenizer.from_pretrained("Cloyne/vietnamese-embedding_finetuned_pair")
+
+            Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3", cache_folder="/myProject/.cache")
+            self.llm = Gemini(model=f"models/{self.model_type}")
+            Settings.llm = self.llm
     
-            self.text_splitter = RecursiveCharacterTextSplitter.from_huggingface_tokenizer(
-                self.tokenizer,
-                chunk_size = 1024,    
-                chunk_overlap = int(64),
-                separators=["\n\n", "\n", "; ", ".", ","],
-                is_separator_regex=False
+            self.text_splitter = TokenTextSplitter(
+                separator=" ", chunk_size=2048, chunk_overlap=64
             )
+
+            self.search_internet = FunctionTool.from_defaults(
+                fn=search_internet_func,
+                name="search_internet_func",
+                description="You could use this tool to find information about banking products, financial news, or any other relevant topic, necessary information.",
+            )
+
+            self.agent_context = AGENT_SYSTEM_PROMPT
 
             print("Successfully initialized BankingAgent with all components!")
         except Exception as e:
             print(f"Error initializing BankingAgent: {e}")
             raise e
     
-    def create_qdrant_vector_collection(self, embeddings, description_chunks_obj, dim=1024, collection_name="PromotionalPolicies"):
+    def create_banking_agent(self, bank_promotional_policies_path="banking_agent/data") -> None:
         try:
-            if self.qdrant_client.collection_exists(collection_name):
-             self.qdrant_client.delete_collection(collection_name=collection_name)
+            documents = SimpleDirectoryReader(bank_promotional_policies_path).load_data()
+        
+            vector_store = QdrantVectorStore(client=self.qdrant_client, collection_name="PromotionalPolicies", )
 
-            self.qdrant_client.create_collection(
-                collection_name=collection_name,
-                vectors_config=VectorParams(size=dim, distance=Distance.COSINE),
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+
+            docstore = SimpleDocumentStore()
+
+            context_extractor = DocumentContextExtractor(
+                docstore=docstore,
+                max_context_length=128000, 
+                oversized_document_strategy="warn",
+                max_output_tokens=512,
+                llm=self.llm,
+                # key=user_id,
+                prompt=DocumentContextExtractor.SUCCINCT_CONTEXT_PROMPT,
             )
 
-            self.qdrant_client.upload_collection(
-                collection_name=collection_name,
-                vectors=embeddings,
-                payload=description_chunks_obj,
-                ids=None,   
-                batch_size=4,  # How many vectors will be uploaded in a single request?
+            index = VectorStoreIndex.from_documents(
+                documents,
+                storage_context=storage_context,
+                transformations=[self.text_splitter, context_extractor]
             )
 
-            print("Successfully upload the collection!")
-        except Exception as e:
-            print(f"Error creating Qdrant vector collection: {e}")
-            raise e
+            query_engine = index.as_query_engine(llm=self.llm, text_splitter=self.text_splitter)
 
-    def embedding_promotional_policies(self) -> dict:
+            tools = [
+                QueryEngineTool(
+                    query_engine=query_engine,
+                    metadata=ToolMetadata(
+                        name="Banking Promotional Policies Query Engine",
+                        description="This tool provides banking promotional policies and information based on user queries. It can answer questions about current banking offers, financial products, and other related topics, use this to find relevant topics related to user's question.",
+                    )
+                ),
+                self.search_internet,
+            ]
+
+            del documents
+            del vector_store
+            del storage_context
+            del context_extractor
+            del docstore
+            del query_engine
+
+            self.agent = ReActAgent.from_tools(tools=tools, llm=self.llm, verbose=True, context=self.agent_context)
+
+            return {"success": True, "message": "Banking agent created successfully!"}
+
+        except Exception as e:
+            print("Error from creating_agent function: ", e)
+            return {"success": False, "message": f"Error while creating banking agent {str(e)}"}
+        
+    def update_user_conversation(self, user_id, new_convo=""):
         try:
-            promotional_policies = get_promotional_policies()
-            if not promotional_policies:
-                return {"success": False, "message": "No promotional policies provided."}
+            if not user_id:
+                return 
 
-            chunks = self.text_splitter.split_text(promotional_policies)
+            user_info = self.user_db_manager.get_user_by_id(user_id)
+            if not user_info:
+                return 
 
-            embeddings = [self.embed_model.encode(chunk, normalize_embeddings=True) for chunk in chunks]
+            user_info['past_conversations'] = user_info.get('past_conversations', '') + new_convo
 
-            description_chunks_obj = [{"text": chunk} for chunk in chunks]
-
-            self.create_qdrant_vector_collection(embeddings, description_chunks_obj)
-            print("Successfully created Qdrant vector collection with embeddings!")
-
-            return {"success": True, "message": "Embeddings created and uploaded to Qdrant."}
+            self.user_db_manager.update_user_info(user_id, user_info)
         except Exception as e:
-            print(f"Error in embedding promotional policies: {e}")
-            return {"success": False, "message": str(e)}
-
-    def retrieve_relevant_promotional_policies(self, user_input, top_k=2, collection_name="PromotionalPolicies") -> dict:
-        try:
-            if not user_input:
-                return {"success": False, "message": "No user input provided."}
-
-            query_embedding = self.embed_model.encode(user_input, normalize_embeddings=True)
-
-            search_results = self.qdrant_client.search(
-                collection_name=collection_name,
-                query_vector=query_embedding,
-                limit=top_k, # take k most relevant results,
-                query_filter=None,  
-            )
-
-            if not search_results:
-                return {"success": False, "relevant_policies": "Không tìm thấy chính sách ưu đãi nào liên quan."}
-
-            relevant_policies = ""
-            for result in search_results:
-                relevant_policies += result.payload['text'] 
-
-            print("Retrieved relevant promotional policies:", relevant_policies)
-
-            return {"success": True, "relevant_policies": relevant_policies}
-        except Exception as e:
-            print(f"Error retrieving promotional policies: {e}")
-            return {"success": False, "message": str(e)}
+            print(f"Error updating user conversation: {e}")
     
     def get_summarization_topics_of_interest_past_convo(self, user_info) -> str:
         past_conversations = user_info.get('past_conversations', '')
@@ -147,26 +173,7 @@ class BankingAgent:
         except Exception as e:
             print(f"Error generating content: {e}")
             return "No summarization available at the moment."
-        
-    def update_user_conversation(self, user_id):
-        try:
-            if not user_id:
-                return 
-
-            user_info = self.user_db_manager.get_user_by_id(user_id)
-            if not user_info:
-                return 
-
-            new_convo = ""
-
-            for message in self.chatbot.get_history():
-                new_convo += f'Role - {message.role}: {message.parts[0].text}\n'
-
-            user_info['past_conversations'] = user_info.get('past_conversations', '') + new_convo
-
-            self.user_db_manager.update_user_info(user_id, user_info)
-        except Exception as e:
-            print(f"Error updating user conversation: {e}")
+    
 
     def get_recommendation(self, user_id) -> dict:
         user_info = self.user_db_manager.get_user_by_id(user_id)
@@ -206,8 +213,8 @@ class BankingAgent:
             "success": True,
             "response": response.text.strip()
         }
-
-    def rag_response(self, user_input, user_id) -> dict:
+    
+    def agent_response(self, user_input, user_id) -> dict:
         try:
             if not user_input:
                 return {"success": False, "message": "No user input provided."}
@@ -215,31 +222,26 @@ class BankingAgent:
             if not user_id:
                 return {"success": False, "message": "No user ID provided."}
             
+            tracking_convo = "Vai trò: Người dùng\nNội dung: " + user_input + "\n"
+
             user_info = self.user_db_manager.get_user_by_id(user_id)
 
-            relevant_policies = self.retrieve_relevant_promotional_policies(user_input)
-            relevant_policies = "Không tìm thấy chính sách khuyến mãi liên quan nào." if not relevant_policies.get("success") else relevant_policies.get("relevant_policies")
+            current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance') if user_info.get('user_current_acc_balance') else 'Không được tiết lộ'}."
 
-            current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance', 0)}."
-
-            final_prompt = RAG_LLM_RESPONSE_PROMPT.format(
+            final_prompt = AGENT_RESPONSE_PROMPT.format(
                 user_question=user_input,
                 current_financial_state=current_financial_state,
-                relevant_banking_info_policies=relevant_policies
             )
 
-            response = self.gemini_client.models.generate_content(
-                model=self.model_type,
-                config=types.GenerateContentConfig(
-                    system_instruction=RAG_LLM_SYSTEM_PROMPT),
-                contents=final_prompt
-            )
+            response = self.agent.chat(final_prompt).response.strip()
 
-            self.update_user_conversation(user_id)
+            tracking_convo += "Vai trò: Trợ lý ngân hàng\nNội dung: " + response + "\n"
+
+            self.update_user_conversation(user_id, tracking_convo)
 
             return {
                 "success": True,
-                "response": response.text.strip()
+                "response": response
             }
         except Exception as e:
             print(f"Error retrieving promotional policies: {e}")

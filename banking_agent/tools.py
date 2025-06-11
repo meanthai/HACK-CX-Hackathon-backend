@@ -2,6 +2,58 @@ import math
 from datetime import datetime
 from typing import Dict
 from user_db_manager import UserSchema
+import os
+
+def search_internet_func(query: str, num_results: int = 2) -> dict:
+    """
+    This function searches the internet for a given query and returns the results.
+    You could use this tool to find information about banking products, financial news, or any other relevant topic.
+    Args:
+        query: The search query string
+        num_results: Number of results to return (default: 5)
+        
+    Returns:
+        A dictionary containing search results or error information
+    """
+    try:
+        if not query or not isinstance(query, str):
+            return {"error": "Query must be a non-empty string"}
+        
+        api_key = os.environ.get("SERP_API_KEY")
+        if not api_key:
+            return {"error": "Search API key not configured"}
+        
+        from serpapi import GoogleSearch
+        
+        params = {
+            "engine": "google",
+            "q": query,
+            "api_key": api_key,
+            "num": num_results
+        }
+        
+        search = GoogleSearch(params)
+        results = search.get_dict()
+        
+        if "error" in results:
+            return {"error": results["error"]}
+        
+        formatted_results = []
+        if "organic_results" in results:
+            for result in results["organic_results"][:num_results]:
+                formatted_results.append({
+                    "title": result.get("title", ""),
+                    "snippet": result.get("snippet", ""),
+                })
+        
+        return {
+            "search_results": formatted_results,
+            "query": query,
+            "total_results_found": len(formatted_results)
+        }
+    
+    except Exception as e:
+        return {"error": f"Search failed: {str(e)}"}
 
 def get_promotional_policies(policies_path = 'banking_agent/banking_promotional_policies.txt') -> str:
     content = ""
