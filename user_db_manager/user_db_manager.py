@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 class UserSchema(BaseModel):
     """
@@ -19,6 +19,8 @@ class UserSchema(BaseModel):
     user_name: str
     user_id: str
     user_current_acc_balance: float = 0.0
+    user_current_acc_debit: float = 0.0
+    user_credit_score: float = 0.0
     total_freq_deposit: int = 0
     total_freq_credit_loan: int = 0
     total_freq_stock_investment: int = 0
@@ -40,23 +42,23 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error connecting to MongoDB: {e}")
 
-    def create_user(self, user_data):
+    def create_user(self, user_data) -> dict:
         """Create a new user"""
         try:
             existing_user = self.collection.find_one({"user_id": user_data["user_id"]})
             if existing_user:
                 print(f"Error: User with user_id '{user_data['user_id']}' already exists!")
-                return None
+                return {"success": False, "message": f"User with user_id '{user_data['user_id']}' already exists!"}
             
             result = self.collection.insert_one(user_data)
             print(f"User created successfully with ID: {result.inserted_id}")
-            return result.inserted_id
+            return {"success": True, "message": f"User created successfully with ID: {result.inserted_id}"}
         
         except Exception as e:
             print(f"Error creating user: {e}")
-            return None
+            return {"success": False, "message": str(e)}
 
-    def get_user_by_id(self, user_id):
+    def get_user_by_id(self, user_id) -> Optional[UserSchema]:
         try:
             user = self.collection.find_one({"user_id": user_id})
             if user:
@@ -69,7 +71,7 @@ class DatabaseManager:
             print(f"Error finding user: {e}")
             return None
 
-    def get_all_users(self):
+    def get_all_users(self) -> List[UserSchema]:
         try:
             users = list(self.collection.find())
             print(f"Found {len(users)} users:")
@@ -78,7 +80,7 @@ class DatabaseManager:
             print(f"Error getting users: {e}")
             return []
 
-    def update_user_info(self, user_id, update_data):
+    def update_user_info(self, user_id, update_data) -> dict:
         try:        
             result = self.collection.update_one(
                 {"user_id": user_id},
@@ -87,14 +89,14 @@ class DatabaseManager:
             
             if result.matched_count > 0:
                 print(f"Successfully updated user '{user_id}' with data: {update_data}")
-                return True
+                return {"success": True, "message": f"User '{user_id}' updated successfully."}
             else:
                 print(f"No user found with user_id: {user_id}")
-                return False
+                return {"success": False, "message": f"No user found with user_id: {user_id}"}
         
         except Exception as e:
             print(f"Error updating user: {e}")
-            return False
+            return {"success": False, "message": str(e)}
 
 def run_examples(db_manager=None):
     """Run example CRUD operations"""

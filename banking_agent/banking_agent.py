@@ -3,18 +3,22 @@ from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from pydantic import BaseModel
+from typing import Literal
 from google import genai
 from google.genai import types
 from user_db_manager import DatabaseManager
 from transformers import AutoTokenizer
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client.models import Distance, VectorParams
-
 from .prompts import RECOMMENDATION_SYSTEM_PROMPT, RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, RAG_LLM_SYSTEM_PROMPT, RAG_LLM_RESPONSE_PROMPT
 from .tools import calculate_topic_care_weights_description, get_promotional_policies
 
 class SummarizationResponse(BaseModel):
     topics_of_interest: str
+
+class RecommendationResponse(BaseModel):
+    response: str
+    explanation: str = Literal(description="Explanation of the recommendation provided by the agent, shorter than 15 words.")
 
 load_dotenv()
 
