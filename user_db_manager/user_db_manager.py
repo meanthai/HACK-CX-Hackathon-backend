@@ -18,6 +18,7 @@ class UserSchema(BaseModel):
     """
     user_name: str
     user_id: str
+    user_type: str = "new_user"  # Default user type
     user_current_acc_balance: float = 0.0
     user_current_acc_debit: float = 0.0
     user_credit_score: float = 0.0
@@ -28,6 +29,14 @@ class UserSchema(BaseModel):
     last_credit_loan_timestamp: Optional[datetime] = None
     last_stock_investment_timestamp: Optional[datetime] = None
     past_conversations: str = Field(description="Past conversations with the user")
+    deposit_account: bool = 0
+    saving: bool = 0
+    credit_card: bool = 0
+    mortgage: bool = 0
+    investment_fund: bool = 0
+    insurance: bool = 0
+    personal_loan: bool = 0
+    fx_transfer: bool = 0
 
 class DatabaseManager:
     def __init__(self, connection_str = "MONGODB_CONNECTION_STRING", db_name="HACK-CX-Hackathon", collection_name="users"):
@@ -97,6 +106,19 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error updating user: {e}")
             return {"success": False, "message": str(e)}
+        
+    def delete_user(self, user_id) -> dict:
+        try:
+            result = self.collection.delete_one({"user_id": user_id})
+            if result.deleted_count > 0:
+                print(f"Successfully deleted user with user_id: {user_id}")
+                return {"success": True, "message": f"User '{user_id}' deleted successfully."}
+            else:
+                print(f"No user found with user_id: {user_id}")
+                return {"success": False, "message": f"No user found with user_id: {user_id}"}
+        except Exception as e:
+            print(f"Error deleting user: {e}")
+            return {"success": False, "message": str(e)}
 
 def run_examples(db_manager=None):
     """Run example CRUD operations"""
@@ -111,6 +133,7 @@ def run_examples(db_manager=None):
         {
             "user_name": "John Doe",
             "user_id": "john_doe_001",
+            "user_type": "new_user",
             "user_current_acc_balance": 1500.50,
             "user_current_acc_debit": 0.0,
             "total_freq_deposit"   : 13,
@@ -123,6 +146,8 @@ def run_examples(db_manager=None):
         }
     ]
     
+    # db_manager.delete_user("john_doe_001")  # Clean up if user already exists
+
     for user in sample_users:
         db_manager.create_user(user)
     

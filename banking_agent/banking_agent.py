@@ -56,12 +56,15 @@ class BankingAgent:
             self.search_internet = FunctionTool.from_defaults(
                 fn=search_internet_func,
                 name="search_internet_func",
-                description="You could use this tool to find information about banking products, financial news, or any other relevant topic, necessary information.",
+                description="Bạn có thể sử dụng công cụ này để tìm thông tin về tin tức tài chính hoặc bất kỳ chủ đề khác liên quan ngân hàng, những thông tin cần thiết",
             )
 
+            self.orchestrator_agent = genai.Client() # Orchestrator agent for managing the flow of conversation and tool usage
             self.behavior_analysis_agent = None # Agent for analyzing user behavior and generating recommendations
-            self.recommendation_agent = genai.Client() # Agent for summarization and recommendation generation
-            self.convo_agent = self.create_banking_agent() # Agent for handling conversations and using tools
+            self.recommendation_agent = genai.Client() # Agent for recommendations generation based on user behavior data, user's topic of interest and bank policies
+            self.base_convo_agent = self.create_banking_agent() # Agent for handling conversations and using tools
+
+            self.convo_agent = {} # support multi-user
 
             print("Successfully initialized BankingAgent with all components!")
         except Exception as e:
@@ -101,8 +104,8 @@ class BankingAgent:
                 QueryEngineTool(
                     query_engine=query_engine,
                     metadata=ToolMetadata(
-                        name="Banking Promotional Policies Query Engine",
-                        description="This tool provides banking promotional policies and information based on user queries. It can answer questions about current banking offers, financial products, and other related topics, use this to find relevant topics related to user's question.",
+                        name="Banking_Promotional_Policies_Query_Engine",
+                        description="Công cụ này cung cấp các chính sách khuyến mãi của ngân hàng dựa theo thông tin hoặc câu hỏi của người dùng. Nó có thể trả lời các câu hỏi về các ưu đãi ngân hàng hiện tại, sản phẩm tài chính, và các chương trình khuyến mãi mới nhất cũng như các thông tin liên quan khác của ngân hàng.",
                     )
                 ),
                 self.search_internet,
@@ -161,11 +164,11 @@ class BankingAgent:
                 contents=final_prompt
             )
 
-            topics_of_interest = response.parsed.topics_of_interest.strip()
+            topics_of_interest = response.parsed.topics_of_interest
 
             print("Summarized topics of interest:", topics_of_interest)
 
-            return topics_of_interest
+            return ", ".join(topics_of_interest)
         except Exception as e:
             print(f"Error generating content: {e}")
             return "No summarization available at the moment."
@@ -223,6 +226,9 @@ class BankingAgent:
     
     def agent_convo_response(self, user_input, user_id) -> dict:
         try:
+            if user_id not in self.convo_agent:
+                self.convo_agent[user_id] = self.base_convo_agent
+
             if not user_input:
                 return {"success": False, "message": "No user input provided."}
             
@@ -240,7 +246,7 @@ class BankingAgent:
                 current_financial_state=current_financial_state,
             )
 
-            response = self.convo_agent.chat(final_prompt).response.strip()
+            response = self.convo_agent[user_id].chat(final_prompt).response.strip()
 
             tracking_convo += "Vai trò: Trợ lý ngân hàng: " + response + "\n"
 
