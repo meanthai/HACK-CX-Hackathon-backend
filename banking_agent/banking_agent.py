@@ -10,7 +10,7 @@ from user_db_manager import DatabaseManager
 from transformers import AutoTokenizer
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client.models import Distance, VectorParams
-from .prompts import RECOMMENDATION_SYSTEM_PROMPT, RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_SYSTEM_PROMPT, AGENT_RESPONSE_PROMPT
+from .prompts import AGENT_RECOMMENDATION_SYSTEM_PROMPT, AGENT_RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_CONVO_SYSTEM_PROMPT, AGENT_CONVO_RESPONSE_PROMPT
 from .tools import calculate_topic_care_weights_description, get_promotional_policies, search_internet_func
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -36,26 +36,20 @@ from llama_index.core.extractors import DocumentContextExtractor
 class SummarizationResponse(BaseModel):
     topics_of_interest: str
 
-# class RecommendationResponse(BaseModel):
-#     response: str
-#     explanation: str = Literal(description="Explanation of the recommendation provided by the agent, shorter than 15 words.")
-
 load_dotenv()
 
 class BankingAgent:
     def __init__(self):
         try:
             self.model_type = "gemini-2.0-flash"
-            self.gemini_client = genai.Client() # for summarization and recommendation generation
-            self.agent = None # Agent for handling conversations and using tools
             self.embed_model = SentenceTransformer('BAAI/bge-m3')
             self.qdrant_client = QdrantClient(url="qdrant_all:6333")
             self.user_db_manager = DatabaseManager()
             self.tokenizer = AutoTokenizer.from_pretrained("Cloyne/vietnamese-embedding_finetuned_pair")
-
             Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-m3", cache_folder="/myProject/.cache")
             self.llm = Gemini(model=f"models/{self.model_type}")
             Settings.llm = self.llm
+            self.agent_convo_context = AGENT_CONVO_SYSTEM_PROMPT
     
             self.text_splitter = TokenTextSplitter(
                 separator=" ", chunk_size=2048, chunk_overlap=64
@@ -67,18 +61,21 @@ class BankingAgent:
                 description="You could use this tool to find information about banking products, financial news, or any other relevant topic, necessary information.",
             )
 
-            self.agent_context = AGENT_SYSTEM_PROMPT
+            self.behavior_analysis_agent = None # Agent for analyzing user behavior and generating recommendations
+            self.recommendation_agent = genai.Client() # Agent for summarization and recommendation generation
+            self.convo_agent = self.create_banking_agent() # Agent for handling conversations and using tools
 
             print("Successfully initialized BankingAgent with all components!")
         except Exception as e:
             print(f"Error initializing BankingAgent: {e}")
             raise e
     
-    def create_banking_agent(self, bank_promotional_policies_path="banking_agent/data") -> None:
+    def create_banking_agent(self, bank_promotional_policies_path="banking_agent/data/banking_promotional_policies.txt"):
         try:
-            documents = SimpleDirectoryReader(bank_promotional_policies_path).load_data()
+            print("data path exist?: ", os.path.isfile(bank_promotional_policies_path))
+            documents = SimpleDirectoryReader(input_files=[bank_promotional_policies_path]).load_data()
         
-            vector_store = QdrantVectorStore(client=self.qdrant_client, collection_name="PromotionalPolicies", )
+            vector_store = QdrantVectorStore(client=self.qdrant_client, collection_name="PromotionalPolicies")
 
             storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
@@ -120,9 +117,10 @@ class BankingAgent:
             del docstore
             del query_engine
 
-            self.agent = ReActAgent.from_tools(tools=tools, llm=self.llm, verbose=True, context=self.agent_context)
+            convo_agent = ReActAgent.from_tools(tools=tools, llm=self.llm, verbose=True, context=self.agent_convo_context)
+            print("Successfully created banking conversation agent!")
 
-            return {"success": True, "message": "Banking agent created successfully!"}
+            return convo_agent
 
         except Exception as e:
             print("Error from creating_agent function: ", e)
@@ -156,7 +154,7 @@ class BankingAgent:
         print("Final prompt for summarization:", final_prompt)
 
         try:
-            response = self.chatbot.models.generate_content(
+            response = self.recommendation_agent.models.generate_content(
                 model=self.model_type,
                 config={
                 'response_mime_type': 'application/json',
@@ -175,7 +173,7 @@ class BankingAgent:
             return "No summarization available at the moment."
     
 
-    def get_recommendation(self, user_id) -> dict:
+    def agent_recommendation_response(self, user_id) -> dict:
         user_info = self.user_db_manager.get_user_by_id(user_id)
         if not user_info:
             return {
@@ -191,7 +189,7 @@ class BankingAgent:
 
         current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance', 0)}."
 
-        final_prompt = RECOMMENDATION_RESPONSE_PROMPT.format(
+        final_prompt = AGENT_RECOMMENDATION_RESPONSE_PROMPT.format(
             topics_of_interest_from_past_conversations=summarization_past_convo,
             topic_care_weights_description=topic_care_weights_description,
             current_financial_state=current_financial_state,
@@ -201,10 +199,10 @@ class BankingAgent:
 
         print("Final prompt for recommendation:", final_prompt)
 
-        response = self.gemini_client.models.generate_content(
+        response = self.recommendation_agent.models.generate_content(
             model=self.model_type,
             config=types.GenerateContentConfig(
-                system_instruction=RECOMMENDATION_SYSTEM_PROMPT),
+                system_instruction=AGENT_RECOMMENDATION_SYSTEM_PROMPT),
             contents=final_prompt
         )
 
@@ -214,7 +212,7 @@ class BankingAgent:
             "response": response.text.strip()
         }
     
-    def agent_response(self, user_input, user_id) -> dict:
+    def agent_convo_response(self, user_input, user_id) -> dict:
         try:
             if not user_input:
                 return {"success": False, "message": "No user input provided."}
@@ -228,12 +226,12 @@ class BankingAgent:
 
             current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance') if user_info.get('user_current_acc_balance') else 'Không được tiết lộ'}."
 
-            final_prompt = AGENT_RESPONSE_PROMPT.format(
+            final_prompt = AGENT_CONVO_RESPONSE_PROMPT.format(
                 user_question=user_input,
                 current_financial_state=current_financial_state,
             )
 
-            response = self.agent.chat(final_prompt).response.strip()
+            response = self.convo_agent.chat(final_prompt).response.strip()
 
             tracking_convo += "Vai trò: Trợ lý ngân hàng\nNội dung: " + response + "\n"
 

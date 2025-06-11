@@ -118,8 +118,8 @@ def get_recommendation(user_id_input: UserID):
     except Exception as e:
         return {"success": False, "message": f"An error occurred while processing the request: {str(e)}"}
 
-@app.post("/api/agent/rag_response")
-def rag_response(input_prompt: InputPrompt):
+@app.post("/api/agent/agent_response")
+def agent_response(input_prompt: InputPrompt):
     try:
         user_input = input_prompt.user_input
         user_id = input_prompt.user_id
@@ -143,7 +143,6 @@ if __name__ == "__main__":
     qdrant_client = QdrantClient(url='qdrant_all:6333')
 
     banking_agent = BankingAgent()
-    banking_agent.create_banking_agent()
     
     # scheduler = BackgroundScheduler()
     # scheduler.add_job(code_generative_agent.delete_inactive_users, "interval", minutes=10)  # Check every 10 minutes
