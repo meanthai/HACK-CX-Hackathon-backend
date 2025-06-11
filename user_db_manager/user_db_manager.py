@@ -3,10 +3,8 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from dotenv import load_dotenv
 import os
-from pydantic import BaseModel, Field
-from datetime import datetime
 from typing import Optional, List
-
+# ------------------------------------------------------------------
 from .user_schema import UserSchema
 
 class DatabaseManager:
