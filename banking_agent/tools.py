@@ -55,7 +55,7 @@ def search_internet_func(query: str, num_results: int = 2) -> dict:
     except Exception as e:
         return {"error": f"Search failed: {str(e)}"}
 
-def get_promotional_policies(policies_path = 'banking_agent/banking_promotional_policies.txt') -> str:
+def get_promotional_policies(policies_path = 'banking_agent/data/banking_promotional_policies.txt') -> str:
     content = ""
     with open(policies_path, 'r') as file:
         content = file.read()
@@ -73,20 +73,20 @@ def format_softmax_weights(weight_dict):
         final_str += f"{round(prob * 100, 2)}% mức độ quan tâm cho sản phẩm: {key}\n"
     return final_str
 
-def calculate_topic_care_weights_description(user: UserSchema, alpha=0.5, beta=0.5, tau=1440) -> str:
+def calculate_topic_care_weights_description(user_info, alpha=0.5, beta=0.5, tau=1440) -> str:
         now = datetime.now()
         
         freqs = {
-            'deposit': user.total_freq_deposit,
-            'credit_loan': user.total_freq_credit_loan,
-            'stock_investment': user.total_freq_stock_investment
+            'deposit': user_info['total_freq_deposit'],
+            'credit_loan': user_info['total_freq_credit_loan'],
+            'stock_investment': user_info['total_freq_stock_investment']
         }
         max_freq = max(freqs.values()) if max(freqs.values()) > 0 else 1  # avoid division by zero
 
         timestamps = {
-            'deposit': user.last_deposit_timestamp,
-            'credit_loan': user.last_credit_loan_timestamp,
-            'stock_investment': user.last_stock_investment_timestamp
+            'deposit': user_info['last_deposit_timestamp'],
+            'credit_loan': user_info['last_credit_loan_timestamp'],
+            'stock_investment': user_info['last_stock_investment_timestamp']
         }
 
         weights = {}

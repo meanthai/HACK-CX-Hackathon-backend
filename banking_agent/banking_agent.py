@@ -3,14 +3,11 @@ from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from pydantic import BaseModel
-from typing import Literal
 from google import genai
 from google.genai import types
 from user_db_manager import DatabaseManager
 from transformers import AutoTokenizer
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from qdrant_client.models import Distance, VectorParams
-from .prompts import AGENT_RECOMMENDATION_SYSTEM_PROMPT, AGENT_RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_CONVO_SYSTEM_PROMPT, AGENT_CONVO_RESPONSE_PROMPT
+from .prompts import AGENT_RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_CONVO_SYSTEM_PROMPT, AGENT_CONVO_RESPONSE_PROMPT
 from .tools import calculate_topic_care_weights_description, get_promotional_policies, search_internet_func
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -21,12 +18,10 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 from llama_index.core.node_parser import TokenTextSplitter
 from typing import List
-from fastapi import UploadFile
 import os
 from llama_index.core import VectorStoreIndex, Settings, StorageContext
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
-from llama_parse import LlamaParse
 from llama_index.core.tools import FunctionTool
 from llama_index.core.storage.docstore.simple_docstore import (
     SimpleDocumentStore,
@@ -34,7 +29,10 @@ from llama_index.core.storage.docstore.simple_docstore import (
 from llama_index.core.extractors import DocumentContextExtractor
 
 class SummarizationResponse(BaseModel):
-    topics_of_interest: str
+    topics_of_interest: List[str]
+
+class RecommendationQuestion(BaseModel):
+    recommendations: List[str]
 
 load_dotenv()
 
@@ -174,43 +172,54 @@ class BankingAgent:
     
 
     def agent_recommendation_response(self, user_id) -> dict:
-        user_info = self.user_db_manager.get_user_by_id(user_id)
-        if not user_info:
+        try:
+            user_info = self.user_db_manager.get_user_by_id(user_id)
+            if not user_info:
+                return {
+                    "success": False,
+                    "response": "Không tìm thấy người dùng trong dữ liệu!"
+                }
+            
+            current_banking_promotional_policies = get_promotional_policies() or ""
+            
+            summarization_past_convo = self.get_summarization_topics_of_interest_past_convo(user_info) or ""
+
+            topic_care_weights_description = calculate_topic_care_weights_description(user_info) or ""
+
+            current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance', 0)}. Số dư nợ hiện tại của người dùng: ${user_info.get('user_current_acc_debit', 0)}."
+
+            final_prompt = AGENT_RECOMMENDATION_RESPONSE_PROMPT.format(
+                topics_of_interest_from_past_conversations=summarization_past_convo,
+                topic_care_weights_description=topic_care_weights_description,
+                current_financial_state=current_financial_state,
+                current_banking_promotional_policies=current_banking_promotional_policies,
+                user_type="regular"
+            )
+
+            print("Final prompt for recommendation:", final_prompt)
+
+            response = self.recommendation_agent.models.generate_content(
+                model=self.model_type,
+                config={
+                    'response_mime_type': 'application/json',
+                    'response_schema': RecommendationQuestion,
+                },
+                contents=final_prompt
+            )
+
+            recommendations = response.parsed.recommendations
+
+            print("Generated recommendation response:", recommendations)
+            return {
+                "success": True,
+                "response": recommendations
+            }
+        except Exception as e:
+            print(f"Error generating recommendation response: {e}")
             return {
                 "success": False,
-                "response": "Không tìm thấy người dùng trong dữ liệu!"
+                "message": str(e)
             }
-        
-        current_banking_promotional_policies = get_promotional_policies() | ""
-        
-        summarization_past_convo = self.get_summarization_topics_of_interest_past_convo(user_info) | ""
-
-        topic_care_weights_description = calculate_topic_care_weights_description(user_info) | ""
-
-        current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance', 0)}."
-
-        final_prompt = AGENT_RECOMMENDATION_RESPONSE_PROMPT.format(
-            topics_of_interest_from_past_conversations=summarization_past_convo,
-            topic_care_weights_description=topic_care_weights_description,
-            current_financial_state=current_financial_state,
-            current_banking_promotional_policies=current_banking_promotional_policies,
-            user_type="regular"
-        )
-
-        print("Final prompt for recommendation:", final_prompt)
-
-        response = self.recommendation_agent.models.generate_content(
-            model=self.model_type,
-            config=types.GenerateContentConfig(
-                system_instruction=AGENT_RECOMMENDATION_SYSTEM_PROMPT),
-            contents=final_prompt
-        )
-
-        print("Generated recommendation response:", response)
-        return {
-            "success": True,
-            "response": response.text.strip()
-        }
     
     def agent_convo_response(self, user_input, user_id) -> dict:
         try:
@@ -224,7 +233,7 @@ class BankingAgent:
 
             user_info = self.user_db_manager.get_user_by_id(user_id)
 
-            current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance') if user_info.get('user_current_acc_balance') else 'Không được tiết lộ'}."
+            current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance') if user_info.get('user_current_acc_balance') else 'Không được tiết lộ'}. Số dư nợ hiện tại của người dùng: ${user_info.get('user_current_acc_debit') if user_info.get('user_current_acc_debit') else 'Không được tiết lộ'}."
 
             final_prompt = AGENT_CONVO_RESPONSE_PROMPT.format(
                 user_question=user_input,
@@ -233,7 +242,7 @@ class BankingAgent:
 
             response = self.convo_agent.chat(final_prompt).response.strip()
 
-            tracking_convo += "Vai trò: Trợ lý ngân hàng\nNội dung: " + response + "\n"
+            tracking_convo += "Vai trò: Trợ lý ngân hàng: " + response + "\n"
 
             self.update_user_conversation(user_id, tracking_convo)
 

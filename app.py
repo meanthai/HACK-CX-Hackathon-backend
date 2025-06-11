@@ -110,7 +110,7 @@ def get_recommendation(user_id_input: UserID):
         if not user_id:
             return {"success": False, "message": "User not found for getting recommendations"}
 
-        recommendations = banking_agent.get_recommendation(user_id)
+        recommendations = banking_agent.agent_recommendation_response(user_id)
         if not recommendations.get("success"):
             return {"success": False, "message": recommendations.get("response", "Không khuyến nghị nào được tìm thấy")}
 
@@ -130,7 +130,7 @@ def agent_response(input_prompt: InputPrompt):
         if not user_id:
             return {"success": False, "message": "User not found for getting responses"}
 
-        response = banking_agent.agent_response(user_input, user_id)
+        response = banking_agent.agent_convo_response(user_input, user_id)
         if not response.get("success"):
             return {"success": False, "message": response.get("message", "No response found")}
 

@@ -112,53 +112,45 @@ def run_examples(db_manager=None):
             "user_name": "John Doe",
             "user_id": "john_doe_001",
             "user_current_acc_balance": 1500.50,
-            "total_freq_deposit"   : 5,
+            "user_current_acc_debit": 0.0,
+            "total_freq_deposit"   : 13,
             "total_freq_credit_loan": 2,
-            "total_freq_stock_investment": 3
-        },
-        {
-            "user_name": "Jane Smith",
-            "user_id": "jane_smith_002",
-            "user_current_acc_balance": 2750.25,
-            "total_freq_deposit"   : 10,
-            "total_freq_credit_loan": 1,
-            "total_freq_stock_investment": 4
-        },
-        {
-            "user_name": "Bob Johnson",
-            "user_id": "bob_johnson_003",
-            "user_current_acc_balance": 1200.00
+            "total_freq_stock_investment": 3,
+            "last_deposit_timestamp": datetime.now(),
+            "last_credit_loan_timestamp": datetime.now(),
+            "last_stock_investment_timestamp": datetime.now(),
+            "past_conversations": """Vai trò - Trợ lý ngân hàng: Tôi là trợ lý ngân hàng của bạn, tôi có thể giúp gì cho bạn hôm nay?Người dùng: Tôi muốn biết số dư tài khoản của mình. Trợ lý ngân hàng: Số dư tài khoản hiện tại của bạn là 1500.50$."""
         }
     ]
     
     for user in sample_users:
         db_manager.create_user(user)
     
-    print("\n2. READING USERS:")
-    print("-" * 30)
+    # print("\n2. READING USERS:")
+    # print("-" * 30)
     
-    db_manager.get_all_users()
+    # db_manager.get_all_users()
     
-    print("\nGetting specific user:")
-    db_manager.get_user_by_id("john_doe_001")
+    # print("\nGetting specific user:")
+    # db_manager.get_user_by_id("john_doe_001")
     
-    print("\n3. UPDATING USERS:")
-    print("-" * 30)
+    # print("\n3. UPDATING USERS:")
+    # print("-" * 30)
     
 
-    db_manager.update_user_info("jane_smith_002", {
-        "user_name": "Jane Smith-Wilson",
-        "user_current_acc_balance": 3000.00
-    })
+    # db_manager.update_user_info("jane_smith_002", {
+    #     "user_name": "Jane Smith-Wilson",
+    #     "user_current_acc_balance": 3000.00
+    # })
     
-    print("\nUsers after updates:")
-    db_manager.get_all_users()
+    # print("\nUsers after updates:")
+    # db_manager.get_all_users()
     
-    print("\n4. DELETING USER:")
-    print("-" * 30)
+    # print("\n4. DELETING USER:")
+    # print("-" * 30)
         
-    print("\nFinal user list:")
-    db_manager.get_all_users()
+    # print("\nFinal user list:")
+    # db_manager.get_all_users()
 
 
 if __name__ == "__main__":

@@ -1,8 +1,7 @@
-AGENT_RECOMMENDATION_SYSTEM_PROMPT = """
-Bạn là một hệ thống gợi ý thông minh trong ứng dụng ngân hàng. Dựa trên các chính sách khuyến mãi hiện tại của ngân hàng và dữ liệu hành vi của người dùng, bao gồm các sản phẩm tài chính yêu thích gần đây của họ với các trọng số quan tâm cụ thể cho từng sản phẩm, các chủ đề họ quan tâm được tổng hợp từ các cuộc trò chuyện trước đó, và tình hình tài chính hiện tại của họ (ví dụ: Số dư tài khoản - 20$, v.v...), bạn cần đưa ra cho họ một số gợi ý hoặc các câu hỏi tiềm năng liên quan đến những chủ đề họ đang quan tâm, dựa trên dữ liệu hành vi được cung cấp ở trên.
-"""
+
 AGENT_RECOMMENDATION_RESPONSE_PROMPT = """
-Vui lòng đưa ra cho người dùng một danh sách bao gồm một số gợi ý hoặc các câu hỏi tiềm năng liên quan đến các chủ đề họ đang quan tâm dựa trên dữ liệu hành vi được cung cấp và các chính sách khuyến mãi hiện tại của ngân hàng dưới đây:
+Bạn là một hệ thống gợi ý câu hỏi thông minh trong ứng dụng ngân hàng. Dựa trên các chính sách khuyến mãi hiện tại của ngân hàng và dữ liệu hành vi của người dùng, bao gồm các sản phẩm tài chính yêu thích gần đây của họ với mức độ phần trăm quan tâm cụ thể cho từng sản phẩm, các chủ đề họ quan tâm được tổng hợp từ các cuộc trò chuyện trước đó, và tình hình tài chính hiện tại của họ (ví dụ: Số dư tài khoản - 20$, v.v...),
+Bạn đưa ra cho người dùng một danh sách các câu hỏi (để người dùng hỏi ngược lại bạn) tiềm năng liên quan đến các chủ đề họ đang quan tâm dựa trên dữ liệu hành vi được cung cấp và các chính sách khuyến mãi hiện tại của ngân hàng dưới đây:
 *Các chủ đề họ quan tâm gần đây từ các cuộc trò chuyện trước:
 -----
 \t{topics_of_interest_from_past_conversations}
