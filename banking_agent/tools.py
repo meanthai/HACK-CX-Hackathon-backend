@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict
 from user_db_manager import UserSchema
 import os
+from .utils_setting import financial_terms_vi, default_credit_constraints, banking_products, default_age_constraints, default_avg_balance_constraints
 
 
 def search_internet_func(query: str, num_results: int = 2) -> dict:
@@ -108,3 +109,27 @@ def calculate_topic_care_weights_description(user_info, alpha=0.5, beta=0.5, tau
         care_weight_description = format_softmax_weights(weights)
 
         return care_weight_description
+
+def get_used_products(user_info) -> str:
+    used_products = []
+    for key, val in financial_terms_vi.items():
+        product = f"used_{key}"
+        if product in user_info and user_info[product]:
+            used_products.append(val)
+
+    return ", ".join(used_products) if used_products else "Không có sản phẩm nào được sử dụng gần đây."
+
+def get_recommended_eligible_products(user_info):
+    unused_products = []
+    recommended_eligible_products = []
+
+    for key in banking_products:
+        product = f"used_{key}"
+        if product in user_info and not user_info[product]:
+            unused_products.append(key)
+
+    for product in unused_products:
+        if user_info["user_age"] >= default_age_constraints[product] and user_info["credit_score"] >= default_credit_constraints[product] and user_info['current_acc_balance'] >= default_avg_balance_constraints[product]:
+            recommended_eligible_products.append(financial_terms_vi[product])
+
+    return ", ".join(recommended_eligible_products) if recommended_eligible_products else "Hãy tự tìm các sản phẩm thích hợp với khách hàng."

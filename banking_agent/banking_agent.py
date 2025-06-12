@@ -29,8 +29,7 @@ from llama_index.core.extractors import DocumentContextExtractor
 # ------------------
 
 from .prompts import AGENT_RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_CONVO_SYSTEM_PROMPT, AGENT_CONVO_RESPONSE_PROMPT, AGENT_ORCHESTRATION_PROMPT
-from .tools import calculate_topic_care_weights_description, get_promotional_policies, search_internet_func
-from .utils_setting import financial_terms_vi, default_credit_constraints, banking_products, default_age_constraints, default_avg_balance_constraints
+from .tools import calculate_topic_care_weights_description, get_promotional_policies, search_internet_func, get_used_products, get_recommended_eligible_products
 
 class SummarizationResponse(BaseModel):
     topics_of_interest: List[str]
@@ -169,30 +168,6 @@ class BankingAgent:
         except Exception as e:
             print(f"Error orchestrating conversation: {e}")
             return {"success": False, "message": str(e)}
-    
-    def get_used_products(self, user_info) -> str:
-        used_products = []
-        for key, val in financial_terms_vi.items():
-            product = f"used_{key}"
-            if product in user_info and user_info[product]:
-                used_products.append(val)
-
-        return ", ".join(used_products) if used_products else "Không có sản phẩm nào được sử dụng gần đây."
-    
-    def get_recommended_eligible_products(self, user_info):
-        unused_products = []
-        recommended_eligible_products = []
-
-        for key in banking_products:
-            product = f"used_{key}"
-            if product in user_info and not user_info[product]:
-                unused_products.append(key)
-
-        for product in unused_products:
-            if user_info["user_age"] >= default_age_constraints[product] and user_info["credit_score"] >= default_credit_constraints[product] and user_info['current_acc_balance'] >= default_avg_balance_constraints[product]:
-                recommended_eligible_products.append(product)
-        
-        return ", ".join(recommended_eligible_products) if recommended_eligible_products else "Hãy tự tìm các sản phẩm thích hợp với khách hàng."
                 
     def get_summarization_topics_of_interest_past_convo(self, user_info) -> str:
         past_conversations = user_info.get('past_conversations', '')
@@ -243,11 +218,10 @@ class BankingAgent:
 
             current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance', 0)}. Số dư nợ hiện tại của người dùng: ${user_info.get('user_current_acc_debit', 0)}."
 
-            used_products = self.get_used_products()
+            used_products = get_used_products(user_info)
+            recommended_eligible_products = get_recommended_eligible_products(user_info)
 
             income_tier = user_info.get("income_tier", "")
-
-            recommended_eligible_products = self.get_recommended_eligible_products(user_info)
 
             final_prompt = AGENT_RECOMMENDATION_RESPONSE_PROMPT.format(
                 topics_of_interest_from_past_conversations=summarization_past_convo,
