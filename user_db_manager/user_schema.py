@@ -14,16 +14,15 @@ class UserSchema(BaseModel):
     user_id: str
     user_email: str
     user_phone_number: str
-    user_age: int = 18 # default
+    user_age: int = 16 # default
     
     income_tier: str 
     user_occupation: str
     user_type: str = "new_user"  # Default user type
 
-    credit_point: float = 0.0
+    credit_score: float = 0.0
     current_acc_balance: float = 0.0
     current_acc_debit: float = 0.0
-    credit_score: float = 0.0
 
     total_freq_deposit: int = 0
     total_freq_credit_loan: int = 0
