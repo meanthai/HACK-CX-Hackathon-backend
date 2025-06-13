@@ -25,11 +25,15 @@ from llama_index.core.storage.docstore.simple_docstore import (
     SimpleDocumentStore,
 )
 from llama_index.core.extractors import DocumentContextExtractor
+from typing import Optional, Literal
+from pydantic import BaseModel
+from PIL import Image
+from io import BytesIO
 
-# ------------------
+# ------------------------------------------------------------------------------------------------------------
 
 from .prompts import AGENT_RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_CONVO_SYSTEM_PROMPT, AGENT_CONVO_RESPONSE_PROMPT, AGENT_ORCHESTRATION_PROMPT
-from .tools import calculate_topic_care_weights_description, get_promotional_policies, search_internet_func, get_used_products, get_recommended_eligible_products
+from .tools import get_promotional_policies, search_internet_func, get_personal_info_and_behaviour_data, get_available_eligible_products, get_used_products, draw_customer_behaviour_analysis
 
 class SummarizationResponse(BaseModel):
     topics_of_interest: List[str]
@@ -37,8 +41,15 @@ class SummarizationResponse(BaseModel):
 class RecommendationQuestion(BaseModel):
     recommendations: List[str]
 
-class BankingRelatedQuestion(BaseModel):
-    related: bool
+class PaymentMetadata(BaseModel):
+    target_acc_id: str
+    ammount: float
+    account_name: str
+
+class NavigationJump(BaseModel):
+    jump_to_other_pages: bool
+    jumping_page: Optional[Literal["payment"]] = None
+    payment_metadata: Optional[PaymentMetadata] = None 
 
 load_dotenv()
 
@@ -54,21 +65,34 @@ class BankingAgent:
             self.llm = Gemini(model=f"models/{self.model_type}")
             Settings.llm = self.llm
             self.agent_convo_context = AGENT_CONVO_SYSTEM_PROMPT
+            self.agent_behavior_analysis_context = "None"
     
             self.text_splitter = TokenTextSplitter(
                 separator=" ", chunk_size=2048, chunk_overlap=64
             )
 
-            self.search_internet = FunctionTool.from_defaults(
+            self.search_internet_tool = FunctionTool.from_defaults(
                 fn=search_internet_func,
-                name="search_internet_func",
+                name="search_internet_tool",
                 description="Bạn có thể sử dụng công cụ này để tìm thông tin về tin tức tài chính hoặc bất kỳ chủ đề khác liên quan ngân hàng, những thông tin cần thiết",
             )
 
+            self.analysis_tool = FunctionTool.from_defaults(
+                fn=get_personal_info_and_behaviour_data,
+                name="get_personal_info_and_behaviour_data_tool",
+                description="Bạn có thể sử dụng công cụ này để tìm thông tin về những chủ đề người dùng quan tâm theo mức độ phần trăm; thông tin về tài khoản ngân hàng như số dư tài khoản, số nợ,...; Và thu nhập của người dùng",
+            )
+
+            self.draw_customer_behaviour_analysis_tool = FunctionTool.from_defaults(
+                fn=draw_customer_behaviour_analysis,
+                name="draw_customer_behaviour_analysis_tool",
+                description="Sử dụng công cụ này để trực quan hóa mức độ quan tâm của khách hàng đối với các sản phẩm tài chính qua biểu đồ hình tròn."
+            )
+
             self.orchestrator_agent = genai.Client() # Orchestrator agent for managing the flow of conversation and tool usage
-            self.behavior_analysis_agent = None # Agent for analyzing user behavior and generating recommendations
+            self.behavior_analysis_agent = self.create_behavior_analysis_agent() # Agent for analyzing user behavior and generating recommendations
             self.recommendation_agent = genai.Client() # Agent for recommendations generation based on user behavior data, user's topic of interest and bank policies
-            self.base_convo_agent = self.create_banking_agent() # Agent for handling conversations and using tools
+            self.base_convo_agent = self.create_convo_agent() # Agent for handling conversations and using tools
 
             self.convo_agent = {} # support multi-user
 
@@ -77,7 +101,7 @@ class BankingAgent:
             print(f"Error initializing BankingAgent: {e}")
             raise e
     
-    def create_banking_agent(self, bank_promotional_policies_path="banking_agent/data/banking_promotional_policies.txt"):
+    def create_convo_agent(self, bank_promotional_policies_path="banking_agent/data/banking_promotional_policies.txt"):
         try:
             print("data path exist?: ", os.path.isfile(bank_promotional_policies_path))
             documents = SimpleDirectoryReader(input_files=[bank_promotional_policies_path]).load_data()
@@ -114,7 +138,7 @@ class BankingAgent:
                         description="Công cụ này cung cấp các chính sách khuyến mãi của ngân hàng dựa theo thông tin hoặc câu hỏi của người dùng. Nó có thể trả lời các câu hỏi về các ưu đãi ngân hàng hiện tại, sản phẩm tài chính, và các chương trình khuyến mãi mới nhất cũng như các thông tin liên quan khác của ngân hàng.",
                     )
                 ),
-                self.search_internet,
+                self.search_internet_tool,
             ]
 
             del documents
@@ -133,7 +157,23 @@ class BankingAgent:
             print("Error from creating_agent function: ", e)
             return {"success": False, "message": f"Error while creating banking agent {str(e)}"}
         
-    def update_user_conversation(self, user_id, new_convo=""):
+    def create_behavior_analysis_agent(self):
+        try:
+            tools = [
+                self.analysis_tool,
+                self.draw_customer_behaviour_analysis_tool
+            ]
+
+            behavior_analysis_agent = ReActAgent.from_tools(tools=tools, llm=self.llm, verbose=True, context=self.agent_behavior_analysis_context)
+            print("Successfully created banking conversation agent!")
+
+            return behavior_analysis_agent
+
+        except Exception as e:
+            print("Error from creating_agent function: ", e)
+            return {"success": False, "message": f"Error while creating banking agent {str(e)}"}
+        
+    def update_user_conversation(self, user_id, new_convo: List[dict] = {}):
         try:
             if not user_id:
                 return 
@@ -142,13 +182,17 @@ class BankingAgent:
             if not user_info:
                 return 
 
-            user_info['past_conversations'] = user_info.get('past_conversations', '') + new_convo
+            new_chat = user_info.get('past_conversations', '')
+            new_chat.extend(new_convo)
+
+            user_info['past_conversations'] = new_chat
 
             self.user_db_manager.update_user_info(user_id, user_info)
+
         except Exception as e:
             print(f"Error updating user conversation: {e}")
 
-    def orchestrate(self, user_input) -> dict:
+    def orchestrate(self, user_input):
         try:
             final_prompt = AGENT_ORCHESTRATION_PROMPT.format(
                 user_question=user_input
@@ -157,20 +201,18 @@ class BankingAgent:
                 model=self.model_type,
                 config={
                 'response_mime_type': 'application/json',
-                'response_schema': BankingRelatedQuestion,
+                'response_schema': NavigationJump,
                 },
                 contents=final_prompt
             )
 
-            return {
-                "is_related": response.parsed.related,
-            }
+            return response.parsed
         except Exception as e:
             print(f"Error orchestrating conversation: {e}")
             return {"success": False, "message": str(e)}
                 
     def get_summarization_topics_of_interest_past_convo(self, user_info) -> str:
-        past_conversations = user_info.get('past_conversations', '')
+        past_conversations = str(user_info.get('past_conversations', '')) # past_convo is a list of dict objects:D, convert to string
 
         if not past_conversations:
             return "Không tồn tại bất kì cuộc hội thoại nào để tóm tắt."
@@ -185,8 +227,8 @@ class BankingAgent:
             response = self.recommendation_agent.models.generate_content(
                 model=self.model_type,
                 config={
-                'response_mime_type': 'application/json',
-                'response_schema': SummarizationResponse,
+                    'response_mime_type': 'application/json',
+                    'response_schema': SummarizationResponse,
                 },
                 contents=final_prompt
             )
@@ -214,23 +256,21 @@ class BankingAgent:
             
             summarization_past_convo = self.get_summarization_topics_of_interest_past_convo(user_info) or ""
 
-            topic_care_weights_description = calculate_topic_care_weights_description(user_info) or ""
+            topic_of_interest_probs, current_financial_state, income_tier = get_personal_info_and_behaviour_data(user_info)
 
-            current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance', 0)}. Số dư nợ hiện tại của người dùng: ${user_info.get('user_current_acc_debit', 0)}."
+            draw_customer_behaviour_analysis(user_info)
 
             used_products = get_used_products(user_info)
-            recommended_eligible_products = get_recommended_eligible_products(user_info)
-
-            income_tier = user_info.get("income_tier", "")
+            available_eligible_products = get_available_eligible_products(user_info)
 
             final_prompt = AGENT_RECOMMENDATION_RESPONSE_PROMPT.format(
                 topics_of_interest_from_past_conversations=summarization_past_convo,
-                topic_care_weights_description=topic_care_weights_description,
+                topic_care_weights_description=topic_of_interest_probs,
                 current_financial_state=current_financial_state,
                 current_banking_promotional_policies=current_banking_promotional_policies,
                 used_products=used_products,
                 income_tier=income_tier,
-                recommended_eligible_products=recommended_eligible_products,
+                recommended_eligible_products=available_eligible_products,
                 user_type="regular"
             )
 
@@ -261,18 +301,27 @@ class BankingAgent:
     
     def agent_convo_response(self, user_input, user_id) -> dict:
         try:
+            if not user_id:
+                return {"success": False, "message": "No user ID provided."}
+            
             if user_id not in self.convo_agent:
                 self.convo_agent[user_id] = self.base_convo_agent
 
             if not user_input:
                 return {"success": False, "message": "No user input provided."}
             
-            if not user_id:
-                return {"success": False, "message": "No user ID provided."}
+            checking_jumping = self.orchestrate(user_input)
+
+            if checking_jumping and checking_jumping.jump_to_other_pages:
+                return {
+                    "success": True,
+                    "jump_to_other_pages": True,
+                    "jumping_page": checking_jumping.jumping_page,
+                    "payment_metadata": checking_jumping.payment_metadata,
+                    "response": "Sure! I will help you with that"
+                }
             
-            # is_related = self.orchestrate(user_input)
-            
-            tracking_convo = "Vai trò: Người dùng\nNội dung: " + user_input + "\n"
+            tracking_convo = [{"Role": "User", "Content": user_input}]
 
             user_info = self.user_db_manager.get_user_by_id(user_id)
 
@@ -285,13 +334,45 @@ class BankingAgent:
 
             response = self.convo_agent[user_id].chat(final_prompt).response.strip()
 
-            tracking_convo += "Vai trò: Trợ lý ngân hàng: " + response + "\n"
+            tracking_convo.append({"Role": "Assistant", "Content": response})
 
             self.update_user_conversation(user_id, tracking_convo)
 
             return {
                 "success": True,
+                "jump_to_other_pages": False,
+                "jumping_page": None,
+                "payment_metadata": None,
                 "response": response
+            }
+        except Exception as e:
+            print(f"Error while Convo Agent responding: {e}")
+            return {"success": False, "message": str(e)}
+        
+    def agent_draw_customer_behaviour_analysis(self, user_id, save_path="banking_agent/customer_behaviour_analysis/banking_product_interest_percentage.jpg"):
+        try:
+            if not user_id:
+                return {"success": False, "message": "No user ID provided."}
+
+            user_info = self.user_db_manager.get_user_by_id(user_id)
+
+            # final_prompt = f"Given this user_info: {user_info}, please use the draw_customer_behaviour_analysis_tool to draw customer's topics of interest diagram. Input the tool function like this:\n"
+
+            # formatted_input = "{user_info: user_info}"
+
+            # response = self.behavior_analysis_agent.chat(final_prompt).response.strip()
+
+            draw_customer_behaviour_analysis(user_info=user_info, save_path=save_path)
+            image = Image.open(save_path)
+
+            # Convert image to binary using BytesIO
+            buffer = BytesIO()
+            image.save(buffer, format="PNG")
+            buffer.seek(0)
+
+            return {
+                "success": True,
+                "image": buffer
             }
         except Exception as e:
             print(f"Error retrieving promotional policies: {e}")

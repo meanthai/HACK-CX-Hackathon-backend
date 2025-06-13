@@ -1,10 +1,8 @@
 import math
 from datetime import datetime
-from typing import Dict
-from user_db_manager import UserSchema
 import os
 from .utils_setting import financial_terms_vi, default_credit_constraints, banking_products, default_age_constraints, default_avg_balance_constraints
-
+from user_db_manager import UserSchema
 
 def search_internet_func(query: str, num_results: int = 2) -> dict:
     """
@@ -73,42 +71,65 @@ def format_softmax_weights(weight_dict):
     final_str = ""
     for key, prob in prob_weights.items():
         final_str += f"{round(prob * 100, 2)}% mức độ quan tâm cho sản phẩm: {key}\n"
-    return final_str
+    return prob_weights, final_str
 
-def calculate_topic_care_weights_description(user_info, alpha=0.5, beta=0.5, tau=1440) -> str:
-        now = datetime.now()
-        
-        freqs = {
-            'deposit': user_info['total_freq_deposit'],
-            'credit_loan': user_info['total_freq_credit_loan'],
-            'stock_investment': user_info['total_freq_stock_investment']
-        }
-        max_freq = max(freqs.values()) if max(freqs.values()) > 0 else 1  # avoid division by zero
+def calculate_topics_of_interest_probs(user_info, alpha=0.6, beta=0.4, tau=1440) -> str:
+    now = datetime.now()
+    
+    freqs = {
+        product: user_info[f"total_freq_{product}"]
+        for product in banking_products
+    }
+    max_freq = max(freqs.values()) if max(freqs.values()) > 0 else 1  
 
-        timestamps = {
-            'deposit': user_info['last_deposit_timestamp'],
-            'credit_loan': user_info['last_credit_loan_timestamp'],
-            'stock_investment': user_info['last_stock_investment_timestamp']
-        }
+    timestamps = {
+        product: user_info[f"last_{product}_timestamp"]
+        for product in banking_products
+    }
 
-        weights = {}
-        for key in freqs:
-            freq = freqs[key]
-            normalized_freq = freq / max_freq
+    weights = {}
+    for key in freqs:
+        freq = freqs[key]
+        normalized_freq = freq / max_freq
 
-            last_time = timestamps[key]
-            if last_time:
-                delta_minutes = (now - last_time).total_seconds() / 60
-                recency_score = math.exp(-delta_minutes / tau)
-            else:
-                recency_score = 0  # if never used
+        last_time = timestamps[key]
+        if last_time:
+            delta_minutes = (now - last_time).total_seconds() / 60
+            recency_score = math.exp(-delta_minutes / tau)
+        else:
+            recency_score = 0  # if never used
 
-            weight = alpha * normalized_freq + beta * recency_score
-            weights[key] = round(weight, 4)  
+        weight = alpha * normalized_freq + beta * recency_score
+        weights[key] = round(weight, 4)  
 
-        care_weight_description = format_softmax_weights(weights)
+    prob_weights, topic_of_interest_probs = format_softmax_weights(weights)
 
-        return care_weight_description
+    return prob_weights, topic_of_interest_probs 
+
+import plotly.graph_objects as go
+
+def draw_customer_behaviour_analysis(user_info: UserSchema, banking_products=banking_products, save_path="banking_agent/customer_behaviour_analysis/banking_product_interest_percentage.jpg"):
+    """
+    Draws and saves a circular pie chart using Plotly to visualize customer interest 
+    percentages towards various banking products based on given information about user_info.
+    
+    Args:
+        user_info : User's information for analyzing the topics of interest probabilities distribution
+        banking_products (list): List of banking product keys (matching `probs`).
+        save_path (str): File path to save the resulting chart image.
+    """
+    prob_weights, _ = calculate_topics_of_interest_probs(user_info)
+    labels = [product.replace("_", " ").title() for product in banking_products]
+    values = [prob_weights.get(product, 0) for product in banking_products]
+
+    fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.3)])
+    fig.update_traces(textinfo='percent+label')
+    fig.update_layout(
+        title_text="Customer Interest in Banking Products (Percentage)",
+        showlegend=True,
+    )
+    
+    fig.write_image(save_path)
 
 def get_used_products(user_info) -> str:
     used_products = []
@@ -119,7 +140,7 @@ def get_used_products(user_info) -> str:
 
     return ", ".join(used_products) if used_products else "Không có sản phẩm nào được sử dụng gần đây."
 
-def get_recommended_eligible_products(user_info):
+def get_available_eligible_products(user_info):
     unused_products = []
     recommended_eligible_products = []
 
@@ -133,3 +154,11 @@ def get_recommended_eligible_products(user_info):
             recommended_eligible_products.append(financial_terms_vi[product])
 
     return ", ".join(recommended_eligible_products) if recommended_eligible_products else "Hãy tự tìm các sản phẩm thích hợp với khách hàng."
+
+def get_personal_info_and_behaviour_data(user_info):
+    _, topic_of_interest_probs = calculate_topics_of_interest_probs(user_info) or ""
+
+    current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance', 0)}. Số dư nợ hiện tại của người dùng: ${user_info.get('user_current_acc_debit', 0)}."
+
+    income_tier = user_info.get("income_tier", "")
+    return topic_of_interest_probs, current_financial_state, income_tier

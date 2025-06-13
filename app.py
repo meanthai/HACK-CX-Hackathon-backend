@@ -134,9 +134,24 @@ def agent_response(input_prompt: InputPrompt):
         if not response.get("success"):
             return {"success": False, "message": response.get("message", "No response found")}
 
-        return {"success": True, "response": response.get("response")}
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/agent/draw_diagram")
+def agent_draw_user_behaviour_diagram(user_id_info: UserID):
+    try:
+        if not user_id_info:
+            return {"success": False, "message": "User id info not found for getting responses"}
+        
+        response = banking_agent.agent_draw_customer_behaviour_analysis(user_id_info.user_id)
+        if not response.get("success"):
+            return {"success": False, "message": response.get("message", "No response found")} 
+
+        return {"success": True, "image": response.get("image", None)}   
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
 

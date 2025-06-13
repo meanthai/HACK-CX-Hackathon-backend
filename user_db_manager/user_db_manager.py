@@ -40,10 +40,8 @@ class DatabaseManager:
         try:
             user = self.collection.find_one({"user_id": user_id})
             if user:
-                print(f"User found: {user}")
                 return user
             else:
-                print(f"No user found with user_id: {user_id}")
                 return None
         except Exception as e:
             print(f"Error finding user: {e}")
@@ -52,7 +50,6 @@ class DatabaseManager:
     def get_all_users(self) -> List[UserSchema]:
         try:
             users = list(self.collection.find())
-            print(f"Found {len(users)} users:")
             return users
         except Exception as e:
             print(f"Error getting users: {e}")
@@ -66,7 +63,6 @@ class DatabaseManager:
             )
             
             if result.matched_count > 0:
-                print(f"Successfully updated user '{user_id}' with data: {update_data}")
                 return {"success": True, "message": f"User '{user_id}' updated successfully."}
             else:
                 print(f"No user found with user_id: {user_id}")
@@ -80,7 +76,6 @@ class DatabaseManager:
         try:
             result = self.collection.delete_one({"user_id": user_id})
             if result.deleted_count > 0:
-                print(f"Successfully deleted user with user_id: {user_id}")
                 return {"success": True, "message": f"User '{user_id}' deleted successfully."}
             else:
                 print(f"No user found with user_id: {user_id}")

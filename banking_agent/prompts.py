@@ -59,8 +59,15 @@ Thông tin trạng thái tài khoản ngân hàng của người dùng:
 """
 
 AGENT_ORCHESTRATION_PROMPT = """
-Bạn hãy giúp tôi phân loại xem câu hỏi được cho bên dưới của người dùng có liên quan đến các chủ đề về ngân hàng hay tài chính, kinh tế hay không. Nếu có thì trả về kết quả boolean True, nếu không thì trả về False. Đây là câu hỏi của người dùng:
+Bạn hãy giúp tôi phân loại xem câu hỏi của người dùng có yêu cầu thanh toán hay không, nếu có hãy trả về biến jump_to_other_pages là True và biến jumping_page thành "payment" và trích xuất các thông tin về số tài khoản, tên tài khoản, và số tiền gửi.
+*Đây là câu hỏi của người dùng:
 -----
 {user_question}
 -----
+"""
+
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+AGENT_BEHAVIOUR_ANALYSIS_SYSTEM_PROMPT = """
 """
