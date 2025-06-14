@@ -35,6 +35,7 @@ import base64
 
 from .prompts import AGENT_RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_CONVO_SYSTEM_PROMPT, AGENT_CONVO_RESPONSE_PROMPT, AGENT_ORCHESTRATION_PROMPT
 from .tools import get_promotional_policies, search_internet_func, get_personal_info_and_behaviour_data, get_available_eligible_products, get_used_products, draw_customer_behaviour_analysis
+from data_analysis_manager import calculate_credit_score, get_top_n_recommendations_new_customer 
 
 class SummarizationResponse(BaseModel):
     topics_of_interest: List[str]

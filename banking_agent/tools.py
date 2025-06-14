@@ -108,6 +108,8 @@ def calculate_topics_of_interest_probs(user_info, alpha=0.6, beta=0.4, tau=1440)
 
 import plotly.graph_objects as go
 
+import plotly.graph_objects as go
+
 def draw_customer_behaviour_analysis(user_info: UserSchema, banking_products=banking_products, save_path="banking_agent/customer_behaviour_analysis/banking_product_interest_percentage.jpg"):
     """
     Draws and saves a circular pie chart using Plotly to visualize customer interest 
@@ -124,13 +126,15 @@ def draw_customer_behaviour_analysis(user_info: UserSchema, banking_products=ban
 
     fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.3)])
     fig.update_traces(textinfo='percent+label')
+
     fig.update_layout(
-        title_text="Customer Interest in Banking Products (Percentage)",
+        margin=dict(l=5, r=5, t=5, b=5),  # minimal padding
         showlegend=True,
-        # paper_bgcolor='rgba(0,0,0,0)',  # Transparent outer background
-        # plot_bgcolor='rgba(0,0,0,0)',   # Transparent plot background
+        title=None,  # remove the title
+        width=700,
+        height=500,
     )
-    
+
     fig.write_image(save_path)
 
 def get_used_products(user_info) -> str:
