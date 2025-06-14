@@ -97,7 +97,7 @@ def calculate_topics_of_interest_probs(user_info, alpha=0.6, beta=0.4, tau=1440)
             delta_minutes = (now - last_time).total_seconds() / 60
             recency_score = math.exp(-delta_minutes / tau)
         else:
-            recency_score = 0  # if never used
+            recency_score = 0
 
         weight = alpha * normalized_freq + beta * recency_score
         weights[key] = round(weight, 4)  
@@ -127,8 +127,8 @@ def draw_customer_behaviour_analysis(user_info: UserSchema, banking_products=ban
     fig.update_layout(
         title_text="Customer Interest in Banking Products (Percentage)",
         showlegend=True,
-        paper_bgcolor='rgba(0,0,0,0)',  # Transparent outer background
-        plot_bgcolor='rgba(0,0,0,0)',   # Transparent plot background
+        # paper_bgcolor='rgba(0,0,0,0)',  # Transparent outer background
+        # plot_bgcolor='rgba(0,0,0,0)',   # Transparent plot background
     )
     
     fig.write_image(save_path)

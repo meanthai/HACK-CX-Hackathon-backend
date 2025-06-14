@@ -213,7 +213,7 @@ class BankingAgent:
             return {"success": False, "message": str(e)}
                 
     def get_summarization_topics_of_interest_past_convo(self, user_info) -> str:
-        past_conversations = str(user_info.get('past_conversations', '')) # past_convo is a list of dict objects:D, convert to string
+        past_conversations = str(user_info.get('past_conversations', '')) # past_convo is a list of dict objects :D, convert to string
 
         if not past_conversations:
             return "Không tồn tại bất kì cuộc hội thoại nào để tóm tắt."
@@ -317,7 +317,7 @@ class BankingAgent:
                     "jump_to_other_pages": True,
                     "jumping_page": checking_jumping.jumping_page,
                     "payment_metadata": checking_jumping.payment_metadata,
-                    "response": "Sure! I will help you with that"
+                    "response": f"Chắc chắn rồi! Mình sẽ giúp bạn thực hiện giao dịch tới số tài khoản {checking_jumping.payment_metadata.target_acc_id} với tên của người nhận là {checking_jumping.payment_metadata.account_name} với số tiền là {checking_jumping.payment_metadata.amount}"
                 }
             
             tracking_convo = [{"Role": "User", "Content": user_input}]
@@ -366,7 +366,6 @@ class BankingAgent:
             draw_customer_behaviour_analysis(user_info=user_info, save_path=save_path)
             image = Image.open(save_path)
 
-            # Convert image to binary using BytesIO
             buffer = BytesIO()
             image.save(buffer, format="PNG")
             encoded_string = base64.b64encode(buffer.getvalue()).decode("utf-8")
