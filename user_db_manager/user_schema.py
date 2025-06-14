@@ -25,7 +25,12 @@ class UserSchema(BaseModel):
     credit_score: float = 0.0
     current_acc_balance: float = 0.0
     current_acc_debit: float = 0.0
-    # tenure_years: float = 0.0
+    tenure_years: int = 0
+    clv_score: float = 0.0
+    monetary_volume: float = 0.0
+    activity_intensity: int = 0
+    recency_days: int = 0
+    investments_aum: float = 0.0
 
     total_freq_deposit_account: int = 0
     total_freq_saving: int = 0
