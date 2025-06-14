@@ -29,6 +29,7 @@ from typing import Optional, Literal
 from pydantic import BaseModel
 from PIL import Image
 from io import BytesIO
+import base64
 
 # ------------------------------------------------------------------------------------------------------------
 
@@ -43,7 +44,7 @@ class RecommendationQuestion(BaseModel):
 
 class PaymentMetadata(BaseModel):
     target_acc_id: str
-    ammount: float
+    amount: float
     account_name: str
 
 class NavigationJump(BaseModel):
@@ -56,7 +57,7 @@ load_dotenv()
 class BankingAgent:
     def __init__(self):
         try:
-            self.model_type = "gemini-2.0-flash"
+            self.model_type = "gemini-2.5-flash-preview-05-20"
             self.embed_model = SentenceTransformer('BAAI/bge-m3')
             self.qdrant_client = QdrantClient(url="qdrant_all:6333")
             self.user_db_manager = DatabaseManager()
@@ -243,7 +244,7 @@ class BankingAgent:
             return "No summarization available at the moment."
     
 
-    def agent_recommendation_response(self, user_id, top_k_questions=5) -> dict:
+    def agent_recommendation_response(self, user_id, top_k_questions=3) -> dict:
         try:
             user_info = self.user_db_manager.get_user_by_id(user_id)
             if not user_info:
@@ -257,8 +258,6 @@ class BankingAgent:
             summarization_past_convo = self.get_summarization_topics_of_interest_past_convo(user_info) or ""
 
             topic_of_interest_probs, current_financial_state, income_tier = get_personal_info_and_behaviour_data(user_info)
-
-            draw_customer_behaviour_analysis(user_info)
 
             used_products = get_used_products(user_info)
             available_eligible_products = get_available_eligible_products(user_info)
@@ -325,11 +324,13 @@ class BankingAgent:
 
             user_info = self.user_db_manager.get_user_by_id(user_id)
 
-            current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance') if user_info.get('user_current_acc_balance') else 'Không được tiết lộ'}. Số dư nợ hiện tại của người dùng: ${user_info.get('user_current_acc_debit') if user_info.get('user_current_acc_debit') else 'Không được tiết lộ'}."
+            topic_of_interest_probs, current_financial_state, income_tier = get_personal_info_and_behaviour_data(user_info)
 
             final_prompt = AGENT_CONVO_RESPONSE_PROMPT.format(
                 user_question=user_input,
                 current_financial_state=current_financial_state,
+                topic_care_weights_description=topic_of_interest_probs,
+                income_tier=income_tier
             )
 
             response = self.convo_agent[user_id].chat(final_prompt).response.strip()
@@ -368,11 +369,11 @@ class BankingAgent:
             # Convert image to binary using BytesIO
             buffer = BytesIO()
             image.save(buffer, format="PNG")
-            buffer.seek(0)
+            encoded_string = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
             return {
                 "success": True,
-                "image": buffer
+                "image": f"data:image/png;base64,{encoded_string}"
             }
         except Exception as e:
             print(f"Error retrieving promotional policies: {e}")

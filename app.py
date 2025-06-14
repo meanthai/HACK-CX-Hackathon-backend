@@ -9,6 +9,7 @@ from qdrant_client import QdrantClient
 from apscheduler.schedulers.background import BackgroundScheduler
 from banking_agent import BankingAgent
 from user_db_manager import UserSchema
+import base64
 nest_asyncio.apply()
 
 class InputPrompt(BaseModel):

@@ -127,6 +127,8 @@ def draw_customer_behaviour_analysis(user_info: UserSchema, banking_products=ban
     fig.update_layout(
         title_text="Customer Interest in Banking Products (Percentage)",
         showlegend=True,
+        paper_bgcolor='rgba(0,0,0,0)',  # Transparent outer background
+        plot_bgcolor='rgba(0,0,0,0)',   # Transparent plot background
     )
     
     fig.write_image(save_path)
