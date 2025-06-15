@@ -7,6 +7,7 @@
 
 # Usage Guidelines:
 * Step 1: Run '_pip install -r requirements.txt_' to install dependencies and libraries.
-* Step 2: Set the necessary environment variables in .env file
+* Step 2: Set the necessary environment variables including** Gemini API Key, MongoDB API Key, and Serp API Key** in .env file
 * Step 3: Run '_docker pull qdrant/qdrant_' to install Qdrant Vector Database via Docker.
+* Step 4: Run '_python app.py_' to start our applications.
 
