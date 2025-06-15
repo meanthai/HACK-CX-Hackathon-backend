@@ -108,8 +108,6 @@ def calculate_topics_of_interest_probs(user_info, alpha=0.6, beta=0.4, tau=1440)
 
 import plotly.graph_objects as go
 
-import plotly.graph_objects as go
-
 def draw_customer_behaviour_analysis(user_info: UserSchema, banking_products=banking_products, save_path="banking_agent/customer_behaviour_analysis/banking_product_interest_percentage.jpg"):
     """
     Draws and saves a circular pie chart using Plotly to visualize customer interest 
@@ -136,6 +134,52 @@ def draw_customer_behaviour_analysis(user_info: UserSchema, banking_products=ban
     )
 
     fig.write_image(save_path)
+
+def draw_investment_distribution_chart(invest_amount_product_example, total_money_spent, save_path="banking_agent/customer_behaviour_analysis/spent_money_distribution.jpg"):
+    spent_money_percentage = {}
+
+    for key, val in invest_amount_product_example.items():
+        spent_money_percentage[key] = val / total_money_spent
+
+    labels = [key.replace("_", " ").title() for key in spent_money_percentage.keys()]
+    values = list(spent_money_percentage.values())
+
+    fig = go.Figure(data=[
+        go.Bar(
+            x=labels,
+            y=values,
+            text=[f"{v:.2f}%" for v in values],
+            textposition='outside',
+            marker_color='teal'
+        )
+    ])
+
+    fig.update_layout(
+        margin=dict(l=5, r=5, t=5, b=5),  # minimal padding
+        title=None,  # remove the title
+        xaxis_title="Banking Product",
+        yaxis_title="Percentage",
+        yaxis=dict(tickformat=","),
+        uniformtext_minsize=8,
+        uniformtext_mode='hide',
+        template="plotly_white",
+        bargap=0.4,
+        height=500
+    )
+
+    fig.write_image(save_path)
+
+from PIL import Image
+from io import BytesIO
+import base64
+
+def encode_diagram(img_path=""):
+    image = Image.open(img_path)
+
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    encoded_string = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    return encoded_string
 
 def get_used_products(user_info) -> str:
     used_products = []
@@ -164,7 +208,7 @@ def get_available_eligible_products(user_info):
 def get_personal_info_and_behaviour_data(user_info):
     _, topic_of_interest_probs = calculate_topics_of_interest_probs(user_info) or ""
 
-    current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('user_current_acc_balance', 0)}. Số dư nợ hiện tại của người dùng: ${user_info.get('user_current_acc_debit', 0)}."
+    current_financial_state = f"Số dư tài khoản hiện tại của người dùng: ${user_info.get('current_acc_balance', 0)} VND. Số dư nợ hiện tại của người dùng: ${user_info.get('current_acc_debit', 0)} VND."
 
     income_tier = user_info.get("income_tier", "")
     return topic_of_interest_probs, current_financial_state, income_tier

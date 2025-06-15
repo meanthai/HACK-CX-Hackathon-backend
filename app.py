@@ -147,9 +147,9 @@ def agent_draw_user_behaviour_diagram(user_id_info: UserID):
         
         response = banking_agent.agent_draw_customer_behaviour_analysis(user_id_info.user_id)
         if not response.get("success"):
-            return {"success": False, "message": response.get("message", "No response found")} 
+            return response
 
-        return {"success": True, "image": response.get("image", None)}   
+        return response   
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

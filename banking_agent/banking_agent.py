@@ -27,14 +27,12 @@ from llama_index.core.storage.docstore.simple_docstore import (
 from llama_index.core.extractors import DocumentContextExtractor
 from typing import Optional, Literal
 from pydantic import BaseModel
-from PIL import Image
-from io import BytesIO
-import base64
+
 
 # ------------------------------------------------------------------------------------------------------------
 
 from .prompts import AGENT_RECOMMENDATION_RESPONSE_PROMPT, SUMMARIZATION_RESPONSE_PROMPT, AGENT_CONVO_SYSTEM_PROMPT, AGENT_CONVO_RESPONSE_PROMPT, AGENT_ORCHESTRATION_PROMPT
-from .tools import get_promotional_policies, search_internet_func, get_personal_info_and_behaviour_data, get_available_eligible_products, get_used_products, draw_customer_behaviour_analysis
+from .tools import get_promotional_policies, search_internet_func, get_personal_info_and_behaviour_data, get_available_eligible_products, get_used_products, draw_customer_behaviour_analysis, encode_diagram, draw_investment_distribution_chart
 from data_analysis_manager import calculate_credit_score, get_top_n_recommendations_new_customer 
 
 class SummarizationResponse(BaseModel):
@@ -54,6 +52,18 @@ class NavigationJump(BaseModel):
     payment_metadata: Optional[PaymentMetadata] = None 
 
 load_dotenv()
+
+invest_amount_product_example = {
+        "deposit_account": 0,
+        "saving": 10000000,
+        "credit_card": 0,
+        "mortgage": 0,
+        "investment_fund": 25000000,
+        "insurance": 0,
+        "personal_loan": 0,
+        "fx_transfer": 5000000
+    }
+total_money_spent = 40000000
 
 class BankingAgent:
     def __init__(self):
@@ -158,7 +168,7 @@ class BankingAgent:
         except Exception as e:
             print("Error from creating_agent function: ", e)
             return {"success": False, "message": f"Error while creating banking agent {str(e)}"}
-        
+    
     def create_behavior_analysis_agent(self):
         try:
             tools = [
@@ -350,8 +360,8 @@ class BankingAgent:
         except Exception as e:
             print(f"Error while Convo Agent responding: {e}")
             return {"success": False, "message": str(e)}
-        
-    def agent_draw_customer_behaviour_analysis(self, user_id, save_path="banking_agent/customer_behaviour_analysis/banking_product_interest_percentage.jpg"):
+    
+    def agent_draw_customer_behaviour_analysis(self, user_id, save_path_img_1="banking_agent/customer_behaviour_analysis/banking_product_interest_percentage.jpg", save_path_img_2="banking_agent/customer_behaviour_analysis/spent_money_distribution.jpg"):
         try:
             if not user_id:
                 return {"success": False, "message": "No user ID provided."}
@@ -364,17 +374,17 @@ class BankingAgent:
 
             # response = self.behavior_analysis_agent.chat(final_prompt).response.strip()
 
-            draw_customer_behaviour_analysis(user_info=user_info, save_path=save_path)
-            image = Image.open(save_path)
-
-            buffer = BytesIO()
-            image.save(buffer, format="PNG")
-            encoded_string = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            draw_customer_behaviour_analysis(user_info=user_info, save_path=save_path_img_1)
+            draw_investment_distribution_chart(invest_amount_product_example=invest_amount_product_example, total_money_spent=total_money_spent)
+            
+            encoded_diagram_1 = encode_diagram(img_path = save_path_img_1)
+            encoded_diagram_2 = encode_diagram(img_path=save_path_img_2)
 
             return {
                 "success": True,
-                "image": f"data:image/png;base64,{encoded_string}"
+                "image_1": f"data:image/png;base64,{encoded_diagram_1}",
+                "image_2": f"data:image/png;base64,{encoded_diagram_2}"
             }
         except Exception as e:
-            print(f"Error retrieving promotional policies: {e}")
+            print(f"Error drawing diagram: {e}")
             return {"success": False, "message": str(e)}
