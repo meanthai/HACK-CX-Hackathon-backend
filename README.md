@@ -23,6 +23,12 @@
 3. **Qdrant Installation**:
    - Follow [Qdrant installation guide](https://qdrant.tech/documentation/quickstart/)
 
+## 🎯 Usage
+
+```bash
+python app.py
+```
+
 ## 📄 License
 
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
