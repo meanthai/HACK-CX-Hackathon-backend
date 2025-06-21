@@ -16,7 +16,7 @@
 
    - Conversation Agent for automating transactions and answering queries
 
-**Scalable Vector Storage**: Supports vector and NoSQL data via a unified database for real-time access.
+- **Scalable Vector Storage**: Supports vector and NoSQL data via a unified database for real-time access.
 
 ## 🚀 Pipeline Overview
 
