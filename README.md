@@ -26,8 +26,7 @@
 
 1. **Clone the repo**:
    ```bash
-   git clone https://github.com/your-org/ROOMELSA.git
-   cd ROOMELSA
+   git clone https://github.com/meanthai/HACK-CX-Hackathon-banking-agent.git
    ```
 
 2. **Setup environment**:
