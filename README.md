@@ -1,6 +1,6 @@
 # Hack <CX> Hackathon 2025 - Banking Agent for Optimizing Customer Experience
 
-[![Hack <CX> Hackathon](https://www.hacktogether.org/)
+[![Hack <CX> Hackathon](https://img.shields.io/badge/SHREC-2025-blue)](https://www.hacktogether.org/)
 
 > This repository hosts the official implementation of my Banking Agent System.
 
