@@ -1,4 +1,8 @@
-# This repo is for the project HACK <CX> Hackathon Banking Agent for Optimizing Customer Experience.
+# Hack <CX> Hackathon 2025 - Banking Agent for Optimizing Customer Experience
+
+[![Hack <CX> Hackathon](https://www.hacktogether.org/)
+
+> This repository hosts the official implementation of my Banking Agent System.
 
 ## 🚀 Pipeline Overview
 
@@ -24,7 +28,7 @@
    - Follow [Qdrant installation guide](https://qdrant.tech/documentation/quickstart/)
 
 ## 🎯 Usage
-Run the following command to start our banking agent system:
+Run the following command to start my Banking Agent system:
 ```bash
 python app.py
 ```
