@@ -24,7 +24,7 @@
    - Follow [Qdrant installation guide](https://qdrant.tech/documentation/quickstart/)
 
 ## 🎯 Usage
-
+Run the following command to start our banking agent system:
 ```bash
 python app.py
 ```
