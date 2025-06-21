@@ -1,8 +1,22 @@
-# Hack <CX> Hackathon 2025 - Banking Agent for Optimizing Customer Experience
+# Hack <CX> Hackathon 2025 - Banking Customer Support Multi-Agent System
 
 [![Hack <CX> Hackathon](https://img.shields.io/badge/Hack%3CCX%3EHackathon-2025-blue)](https://www.hacktogether.org/)
 
-> This repository hosts the official implementation of my Banking Agent System.
+> This repository hosts the official implementation of Banking Customer Support Multi-Agent System.
+
+## ✨ Features
+- **User-Centered Banking Assistant**: Combines user behavior, banking info, and past interactions for personalized support.
+
+- **Embedding-Powered Data Processing**: Uses BGE-M3 to embed promotional and behavioral data for efficient retrieval.
+
+- **Dual-Agent Architecture**:
+   - Behaviour Analysis Agent for extracting and analyzing customer's behaviours. 
+
+   - Recommendation Agent for personalized banking offers
+
+   - Conversation Agent for automating transactions and answering queries
+
+**Scalable Vector Storage**: Supports vector and NoSQL data via a unified database for real-time access.
 
 ## 🚀 Pipeline Overview
 
