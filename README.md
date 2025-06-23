@@ -14,7 +14,7 @@
 
    - Conversation Agent for automating transactions and answering queries
 
-- **Cooperative Multi-Agent System**:  Agents work together to enhance user experience. The Behavior Analysis Agent supplies insights that improve the Recommendation and Conversation Agents, which in turn update the user’s preferences and interests—forming a continuous, supportive feedback loop.
+- **Cooperative Multi-Agent System**:  Agents cooperate with each other for customer experience's enhancement. The Behavior Analysis Agent supplies insights that improve the Recommendation and Conversation Agents, which in turn update the user’s preferences and interests—forming a continuous, supportive feedback loop.
 
 ## 🚀 Pipeline Overview
 
