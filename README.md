@@ -7,16 +7,14 @@
 ## ✨ Features
 - **User-Centered Banking Assistant**: Combines user behavior, banking info, and past interactions for personalized support.
 
-- **Embedding-Powered Data Processing**: Uses BGE-M3 to embed promotional and behavioral data for efficient retrieval.
-
-- **Dual-Agent Architecture**:
+- **Multi-Agent Architecture**:
    - Behaviour Analysis Agent for extracting and analyzing customer's behaviours. 
 
    - Recommendation Agent for personalized banking offers
 
    - Conversation Agent for automating transactions and answering queries
 
-- **Scalable Vector Storage**: Supports vector and NoSQL data via a unified database for real-time access.
+- **Cooperative Multi-Agent System**:  Agents work together to enhance user experience. The Behavior Analysis Agent supplies insights that improve the Recommendation and Conversation Agents, which in turn update the user’s preferences and interests—forming a continuous, supportive feedback loop.
 
 ## 🚀 Pipeline Overview
 
