@@ -8,11 +8,11 @@
 - **User-Centered Banking Assistant**: Combines user behavior, banking info, and past interactions for personalized support.
 
 - **Multi-Agent Architecture**:
-   - Behaviour Analysis Agent for extracting and analyzing customer's behaviours. 
+   - Behaviour Analysis Agent for extracting and analyzing customer's behaviours, automatically supporting visualization for customer's behaviour analysis. 
 
-   - Recommendation Agent for personalized banking offers
+   - Recommendation Agent for personalized banking offers based on customer's analysis results and bank promotional policies.
 
-   - Conversation Agent for automating transactions and answering queries
+   - Conversation Agent for automating transactions and answering user's questions with memory (RAG-based).
 
 - **Cooperative Multi-Agent System**:  Agents cooperate with each other for customer experience's enhancement. The Behavior Analysis Agent supplies insights that improve the Recommendation and Conversation Agents, which in turn update the user’s preferences and interests—forming a continuous, supportive feedback loop.
 
